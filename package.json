@@ -8,12 +8,12 @@
     "dev:plain": "vite",
     "build": "npm run build:data && vite build",
     "preview": "vite preview",
-    "render:manim": "python scripts/render_manim.py",
-    "build:proofs": "python scripts/render_manim.py",
-    "build:proofs:text": "python scripts/render_manim.py --text-only",
-    "build:definitions": "python scripts/build_definitions.py",
+    "render:manim": "python3 scripts/render_manim.py",
+    "build:proofs": "python3 scripts/render_manim.py",
+    "build:proofs:text": "python3 scripts/render_manim.py --text-only",
+    "build:definitions": "python3 scripts/build_definitions.py --render-animations",
     "build:data": "npm run build:proofs && npm run build:definitions",
-    "build:text": "npm run build:proofs:text && npm run build:definitions"
+    "build:text": "npm run build:proofs:text && python3 scripts/build_definitions.py"
   },
   "devDependencies": {
     "vite": "^5.2.8"

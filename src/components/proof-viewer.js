@@ -2,307 +2,353 @@ import katex from "katex";
 import { renderRichText } from "../utils/rich-text.js";
 import { tagList } from "../utils/tags.js";
 
-// If you are using a bundler (Vite/Webpack) that handles assets, 
+// If you are using a bundler (Vite/Webpack) that handles assets,
 // you might ensure the CSS/Fonts are in your build output.
-// For Shadow DOM, we often still need to reference the CSS file via URL 
+// For Shadow DOM, we often still need to reference the CSS file via URL
 // or inject the CSS string directly.
 
 class ProofViewer extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: "open" });
-    this.animation = null;
-    this.currentSectionIndex = 0;
-    this.hasStarted = false;
-    this.autoplayTimer = null;
-    this.autoplayActive = false;
-    this.autoplayVideo = null;
-    this.autoplayEndListener = null;
-    this.pendingStepIndex = null;
-  }
+	constructor() {
+		super();
+		this.attachShadow({ mode: "open" });
+		this.animation = null;
+		this.currentSectionIndex = 0;
+		this.hasStarted = false;
+		this.autoplayTimer = null;
+		this.autoplayActive = false;
+		this.autoplayVideo = null;
+		this.autoplayEndListener = null;
+		this.pendingStepIndex = null;
+		this.lastFramePoster = null;
+	}
 
-  set animation(value) {
-    this.stopAutoplay(false);
-    this._animation = value;
-    this.currentSectionIndex = 0;
-    this.hasStarted = false;
-    this.render();
-  }
+	set animation(value) {
+		this.stopAutoplay(false);
+		this._animation = value;
+		this.currentSectionIndex = 0;
+		this.hasStarted = false;
+		this.lastFramePoster = null;
+		this.render();
+	}
 
-  get animation() {
-    return this._animation;
-  }
+	get animation() {
+		return this._animation;
+	}
 
-  set requestedStepIndex(value) {
-    if (value === null || value === undefined) {
-      this.pendingStepIndex = null;
-      return;
-    }
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      this.pendingStepIndex = parsed;
-      this.applyRequestedStep();
-    }
-  }
+	set requestedStepIndex(value) {
+		if (value === null || value === undefined) {
+			this.pendingStepIndex = null;
+			return;
+		}
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) {
+			this.pendingStepIndex = parsed;
+			this.applyRequestedStep();
+		}
+	}
 
-  connectedCallback() {
-    this.loadGlobalStyles()
-      .then(() => {
-        // 2. Only render once CSS is confirmed ready
-        this.render(); 
-      })
-      .catch(err => {
-        console.error("KaTeX CSS failed to load:", err);
-        // Render anyway so text appears (even if ugly)
-        this.render();
-      });
-  }
+	connectedCallback() {
+		this.loadGlobalStyles()
+			.then(() => {
+				// 2. Only render once CSS is confirmed ready
+				this.render();
+			})
+			.catch((err) => {
+				console.error("KaTeX CSS failed to load:", err);
+				// Render anyway so text appears (even if ugly)
+				this.render();
+			});
+	}
 
-  disconnectedCallback() {
-    this.stopAutoplay(false);
-  }
+	disconnectedCallback() {
+		this.stopAutoplay(false);
+	}
 
-  get proofSteps() {
-    const steps = this.animation?.proof?.steps;
-    if (Array.isArray(steps)) return steps;
-    return [];
-  }
+	get proofSteps() {
+		const steps = this.animation?.proof?.steps;
+		if (Array.isArray(steps)) return steps;
+		return [];
+	}
 
-  get theoremStatement() {
-    return (
-      this.animation?.proof?.statement ||
-      this.proofSteps[0]?.statement ||
-      ""
-    );
-  }
+	get theoremStatement() {
+		return (
+			this.animation?.proof?.statement || this.proofSteps[0]?.statement || ""
+		);
+	}
 
-  get sections() {
-    return Array.isArray(this.animation?.sections) ? this.animation.sections : [];
-  }
+	get sections() {
+		return Array.isArray(this.animation?.sections)
+			? this.animation.sections
+			: [];
+	}
 
-  get introSectionIndex() {
-    if (!this.sections.length) return -1;
-    const flaggedIndex = this.sections.findIndex(
-      (section) => section?.isIntro === true || section?.is_intro === true,
-    );
-    if (flaggedIndex >= 0) return flaggedIndex;
-    // Default: first section is the intro clip for the start screen.
-    return 0;
-  }
+	get introSectionIndex() {
+		if (!this.sections.length) return -1;
+		const flaggedIndex = this.sections.findIndex(
+			(section) => section?.isIntro === true || section?.is_intro === true,
+		);
+		if (flaggedIndex >= 0) return flaggedIndex;
+		// Default: first section is the intro clip for the start screen.
+		return 0;
+	}
 
-  get introSection() {
-    if (this.introSectionIndex < 0) return null;
-    return this.sections[this.introSectionIndex] || null;
-  }
+	get introSection() {
+		if (this.introSectionIndex < 0) return null;
+		return this.sections[this.introSectionIndex] || null;
+	}
 
-  get playableSections() {
-    if (!this.sections.length) return [];
-    if (this.introSectionIndex < 0) return this.sections;
-    return this.sections.filter((_, idx) => idx !== this.introSectionIndex);
-  }
+	get playableSections() {
+		if (!this.sections.length) return [];
+		if (this.introSectionIndex < 0) return this.sections;
+		return this.sections.filter((_, idx) => idx !== this.introSectionIndex);
+	}
 
-  get stepCount() {
-    const stepLen = this.proofSteps.length;
-    const playableLen = this.playableSections.length;
-    if (stepLen && playableLen) return Math.min(stepLen, playableLen);
-    return stepLen || playableLen || 0;
-  }
+	get stepCount() {
+		const stepLen = this.proofSteps.length;
+		const playableLen = this.playableSections.length;
+		if (stepLen && playableLen) return Math.min(stepLen, playableLen);
+		return stepLen || playableLen || 0;
+	}
 
-  clampIndex(index) {
-    if (this.stepCount <= 0) return 0;
-    const clampedIndex = Math.min(Math.max(index, 0), Math.max(0, this.stepCount - 1));
-    return clampedIndex;
-  }
+	clampIndex(index) {
+		if (this.stepCount <= 0) return 0;
+		const clampedIndex = Math.min(
+			Math.max(index, 0),
+			Math.max(0, this.stepCount - 1),
+		);
+		return clampedIndex;
+	}
 
-  emitStepChange(stepIndex = this.currentSectionIndex) {
-    this.dispatchEvent(
-      new CustomEvent("step-change", {
-        detail: {
-          stepIndex: typeof stepIndex === "number" && Number.isFinite(stepIndex) ? stepIndex : null,
-          stepNumber: typeof stepIndex === "number" && Number.isFinite(stepIndex) ? stepIndex + 1 : null,
-        },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-  }
+	emitStepChange(stepIndex = this.currentSectionIndex) {
+		this.dispatchEvent(
+			new CustomEvent("step-change", {
+				detail: {
+					stepIndex:
+						typeof stepIndex === "number" && Number.isFinite(stepIndex)
+							? stepIndex
+							: null,
+					stepNumber:
+						typeof stepIndex === "number" && Number.isFinite(stepIndex)
+							? stepIndex + 1
+							: null,
+				},
+				bubbles: true,
+				composed: true,
+			}),
+		);
+	}
 
-  setSection(index, options = {}) {
-    const { silent = false } = options;
-    const clampedIndex = this.clampIndex(index);
-    if (!this.hasStarted) {
-      this.hasStarted = true;
-      this.currentSectionIndex = clampedIndex;
-      this.render();
-      if (!silent) this.emitStepChange(clampedIndex);
-      return;
-    }
-    if (clampedIndex === this.currentSectionIndex) return;
-    this.currentSectionIndex = clampedIndex;
-    this.render();
-    if (!silent) this.emitStepChange(clampedIndex);
-  }
+	setSection(index, options = {}) {
+		const { silent = false } = options;
+		const clampedIndex = this.clampIndex(index);
+		if (!this.hasStarted) {
+			this.lastFramePoster = null;
+			this.captureCurrentFrameAsPoster();
+			this.hasStarted = true;
+			this.currentSectionIndex = clampedIndex;
+			this.render();
+			if (!silent) this.emitStepChange(clampedIndex);
+			return;
+		}
+		if (clampedIndex === this.currentSectionIndex) return;
+		this.lastFramePoster = null;
+		this.captureCurrentFrameAsPoster();
+		this.currentSectionIndex = clampedIndex;
+		this.render();
+		if (!silent) this.emitStepChange(clampedIndex);
+	}
 
-  changeSection(delta) {
-    this.setSection(this.currentSectionIndex + delta);
-  }
+	changeSection(delta) {
+		this.setSection(this.currentSectionIndex + delta);
+	}
 
-  startProof(index = 0, options = {}) {
-    this.setSection(index, options);
-  }
+	startProof(index = 0, options = {}) {
+		this.setSection(index, options);
+	}
 
-  getActiveSection() {
-    if (!this.playableSections.length && !this.sections.length) return null;
+	getActiveSection() {
+		if (!this.playableSections.length && !this.sections.length) return null;
 
-    if (!this.hasStarted) {
-      return this.introSection || this.playableSections[0] || this.sections[0] || null;
-    }
+		if (!this.hasStarted) {
+			return (
+				this.introSection ||
+				this.playableSections[0] ||
+				this.sections[0] ||
+				null
+			);
+		}
 
-    const playable = this.playableSections;
-    if (!playable.length) return null;
-    const safeIndex = Math.min(Math.max(this.currentSectionIndex, 0), playable.length - 1);
-    return playable[safeIndex];
-  }
+		const playable = this.playableSections;
+		if (!playable.length) return null;
+		const safeIndex = Math.min(
+			Math.max(this.currentSectionIndex, 0),
+			playable.length - 1,
+		);
+		return playable[safeIndex];
+	}
 
-  get progress() {
-    const count = this.stepCount;
-    if (!count || !this.hasStarted) return 0;
-    return Math.round(((this.currentSectionIndex + 1) / count) * 100);
-  }
+	get progress() {
+		const count = this.stepCount;
+		if (!count || !this.hasStarted) return 0;
+		return Math.round(((this.currentSectionIndex + 1) / count) * 100);
+	}
 
-  clearAutoplayTimer() {
-    if (this.autoplayTimer) {
-      clearTimeout(this.autoplayTimer);
-      this.autoplayTimer = null;
-    }
-  }
+	clearAutoplayTimer() {
+		if (this.autoplayTimer) {
+			clearTimeout(this.autoplayTimer);
+			this.autoplayTimer = null;
+		}
+	}
 
-  detachAutoplayListener() {
-    if (this.autoplayVideo && this.autoplayEndListener) {
-      this.autoplayVideo.removeEventListener("ended", this.autoplayEndListener);
-    }
-    this.autoplayVideo = null;
-    this.autoplayEndListener = null;
-  }
+	detachAutoplayListener() {
+		if (this.autoplayVideo && this.autoplayEndListener) {
+			this.autoplayVideo.removeEventListener("ended", this.autoplayEndListener);
+		}
+		this.autoplayVideo = null;
+		this.autoplayEndListener = null;
+	}
 
-  stopAutoplay(shouldRender = true) {
-    const wasActive = this.autoplayActive;
-    this.autoplayActive = false;
-    this.clearAutoplayTimer();
-    this.detachAutoplayListener();
-    if (wasActive && shouldRender) this.render();
-  }
+	stopAutoplay(shouldRender = true) {
+		const wasActive = this.autoplayActive;
+		this.autoplayActive = false;
+		this.clearAutoplayTimer();
+		this.detachAutoplayListener();
+		if (wasActive && shouldRender) this.render();
+	}
 
-  startAutoplay() {
-    if (!this.stepCount) return;
-    this.autoplayActive = true;
-    this.clearAutoplayTimer();
-    this.detachAutoplayListener();
-    if (!this.hasStarted) {
-      this.startProof(0);
-    } else {
-      this.render();
-    }
-  }
+	startAutoplay() {
+		if (!this.stepCount) return;
+		this.autoplayActive = true;
+		this.clearAutoplayTimer();
+		this.detachAutoplayListener();
+		if (!this.hasStarted) {
+			this.startProof(0);
+		} else {
+			this.render();
+		}
+	}
 
-  toggleAutoplay() {
-    if (this.autoplayActive) {
-      this.stopAutoplay();
-    } else {
-      this.startAutoplay();
-    }
-  }
+	toggleAutoplay() {
+		if (this.autoplayActive) {
+			this.stopAutoplay();
+		} else {
+			this.startAutoplay();
+		}
+	}
 
-  queueAutoplayTick() {
-    this.clearAutoplayTimer();
-    this.detachAutoplayListener();
-    if (!this.autoplayActive) return;
+	queueAutoplayTick() {
+		this.clearAutoplayTimer();
+		this.detachAutoplayListener();
+		if (!this.autoplayActive) return;
 
-    const scheduleAdvance = () => {
-      if (this.currentSectionIndex >= this.stepCount - 1) {
-        this.stopAutoplay(true);
-        return;
-      }
-      this.clearAutoplayTimer();
-      this.autoplayTimer = setTimeout(() => {
-        if (!this.autoplayActive) return;
-        if (this.currentSectionIndex >= this.stepCount - 1) {
-          this.stopAutoplay(true);
-          return;
-        }
-        this.changeSection(1);
-      }, 2000);
-    };
+		const scheduleAdvance = () => {
+			if (this.currentSectionIndex >= this.stepCount - 1) {
+				this.stopAutoplay(true);
+				return;
+			}
+			this.clearAutoplayTimer();
+			this.autoplayTimer = setTimeout(() => {
+				if (!this.autoplayActive) return;
+				if (this.currentSectionIndex >= this.stepCount - 1) {
+					this.stopAutoplay(true);
+					return;
+				}
+				this.changeSection(1);
+			}, 2000);
+		};
 
-    const video = this.shadowRoot?.querySelector("video");
-    if (!video) {
-      scheduleAdvance();
-      return;
-    }
+		const video = this.shadowRoot?.querySelector("video");
+		if (!video) {
+			scheduleAdvance();
+			return;
+		}
 
-    this.autoplayVideo = video;
-    this.autoplayEndListener = () => {
-      scheduleAdvance();
-    };
+		this.autoplayVideo = video;
+		this.autoplayEndListener = () => {
+			scheduleAdvance();
+		};
 
-    if (video.ended) {
-      scheduleAdvance();
-      return;
-    }
+		if (video.ended) {
+			scheduleAdvance();
+			return;
+		}
 
-    video.addEventListener("ended", this.autoplayEndListener, { once: true });
-    if (video.paused && !video.ended) {
-      video.play().catch(() => {});
-    }
-  }
+		video.addEventListener("ended", this.autoplayEndListener, { once: true });
+		if (video.paused && !video.ended) {
+			video.play().catch(() => {});
+		}
+	}
 
-  /**
-   * Safe Text Parser
-   * Uses shared renderer for KaTeX + basic Markdown.
-   */
-  parseContent(text) {
-    return renderRichText(text);
-  }
+	/**
+	 * Safe Text Parser
+	 * Uses shared renderer for KaTeX + basic Markdown.
+	 */
+	parseContent(text) {
+		return renderRichText(text);
+	}
 
-  filterCurrentOnly(text, isActive) {
-    if (typeof text !== "string") return text;
-    return text.replace(/\[\[current-only\]\]([\s\S]*?)\[\[\/current-only\]\]/gi, (_, inner) =>
-      isActive ? inner : "",
-    );
-  }
+	captureCurrentFrameAsPoster() {
+		// Grab the last painted frame so the next section can use it as a poster.
+		if (!this.shadowRoot) return;
+		const video = this.shadowRoot.querySelector("video");
+		if (!video || video.readyState < 2) return;
+		const { videoWidth, videoHeight } = video;
+		if (!videoWidth || !videoHeight) return;
+		const canvas = document.createElement("canvas");
+		canvas.width = videoWidth;
+		canvas.height = videoHeight;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return;
+		try {
+			ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+			this.lastFramePoster = canvas.toDataURL("image/jpeg", 0.85);
+		} catch (err) {
+			// Ignore capture failures (e.g., cross-origin protection).
+			this.lastFramePoster = null;
+		}
+	}
 
-  get claims() {
-    const claims = this.animation?.proof?.claims;
-    return Array.isArray(claims) ? claims : [];
-  }
+	filterCurrentOnly(text, isActive) {
+		if (typeof text !== "string") return text;
+		return text.replace(
+			/\[\[current-only\]\]([\s\S]*?)\[\[\/current-only\]\]/gi,
+			(_, inner) => (isActive ? inner : ""),
+		);
+	}
 
-  get activeClaimId() {
-    const claims = this.claims;
-    if (!claims.length) return null;
-    const requested = this.animation?.proof?.activeClaimId;
-    const found = claims.find((claim) => claim?.id === requested);
-    if (found) return found.id;
-    return claims[0]?.id || null;
-  }
+	get claims() {
+		const claims = this.animation?.proof?.claims;
+		return Array.isArray(claims) ? claims : [];
+	}
 
-  get activeClaim() {
-    const activeId = this.activeClaimId;
-    if (!activeId) return null;
-    return this.claims.find((claim) => claim?.id === activeId) || null;
-  }
+	get activeClaimId() {
+		const claims = this.claims;
+		if (!claims.length) return null;
+		const requested = this.animation?.proof?.activeClaimId;
+		const found = claims.find((claim) => claim?.id === requested);
+		if (found) return found.id;
+		return claims[0]?.id || null;
+	}
 
-  renderClaimTabs() {
-    const claims = this.claims;
-    if (!claims.length) return "";
-    const activeId = this.activeClaimId;
-    if (claims.length === 1 && (!claims[0].label || claims[0].label === "main")) return "";
+	get activeClaim() {
+		const activeId = this.activeClaimId;
+		if (!activeId) return null;
+		return this.claims.find((claim) => claim?.id === activeId) || null;
+	}
 
-    const buttons = claims
-      .map((claim) => {
-        const isActive = claim?.id === activeId;
-        const target = claim?.animationId || "";
-        const label = claim?.label || claim?.id || "";
-        return `
+	renderClaimTabs() {
+		const claims = this.claims;
+		if (!claims.length) return "";
+		const activeId = this.activeClaimId;
+		if (claims.length === 1 && (!claims[0].label || claims[0].label === "main"))
+			return "";
+
+		const buttons = claims
+			.map((claim) => {
+				const isActive = claim?.id === activeId;
+				const target = claim?.animationId || "";
+				const label = claim?.label || claim?.id || "";
+				return `
           <button
             class="claim-chip ${isActive ? "active" : ""}"
             data-claim-id="${claim?.id ?? ""}"
@@ -313,142 +359,159 @@ class ProofViewer extends HTMLElement {
             ${this.parseContent(label)}
           </button>
         `;
-      })
-      .join("");
+			})
+			.join("");
 
-    return `<div class="claim-tabs" role="tablist" aria-label="Proof variants">${buttons}</div>`;
-  }
+		return `<div class="claim-tabs" role="tablist" aria-label="Proof variants">${buttons}</div>`;
+	}
 
-  renderTranscript(proofSteps) {
-    const limit = Math.min(this.currentSectionIndex + 1, proofSteps.length);
-    const stepsToRender = proofSteps.slice(0, limit);
-    if (!stepsToRender.length) return "";
+	renderTranscript(proofSteps) {
+		const limit = Math.min(this.currentSectionIndex + 1, proofSteps.length);
+		const stepsToRender = proofSteps.slice(0, limit);
+		if (!stepsToRender.length) return "";
 
-    const combined = stepsToRender
-      .map((proofStep, idx) => {
-        const isActive = idx === this.currentSectionIndex;
-        const rawStatement = proofStep?.statement || "This section is pending a description.";
-        const filtered = this.filterCurrentOnly(rawStatement, isActive);
-        return typeof filtered === "string" ? filtered.trim() : "";
-      })
-      .filter(Boolean)
-      .join(" ");
+		const combined = stepsToRender
+			.map((proofStep, idx) => {
+				const isActive = idx === this.currentSectionIndex;
+				const rawStatement =
+					proofStep?.statement || "This section is pending a description.";
+				const filtered = this.filterCurrentOnly(rawStatement, isActive);
+				return typeof filtered === "string" ? filtered.trim() : "";
+			})
+			.filter(Boolean)
+			.join(" ");
 
-    if (!combined) return "";
-    const html = this.parseContent(combined);
-    return `<span class="flow-sentence">${html}</span>`;
-  }
+		if (!combined) return "";
+		const html = this.parseContent(combined);
+		return `<span class="flow-sentence">${html}</span>`;
+	}
 
-  getNumberTag(entry, fallback = null) {
-    const primary = tagList(entry).find((tag) => tag.kind === "number");
-    if (primary) return primary;
-    const secondary = fallback ? tagList(fallback).find((tag) => tag.kind === "number") : null;
-    return secondary || null;
-  }
+	getNumberTag(entry, fallback = null) {
+		const primary = tagList(entry).find((tag) => tag.kind === "number");
+		if (primary) return primary;
+		const secondary = fallback
+			? tagList(fallback).find((tag) => tag.kind === "number")
+			: null;
+		return secondary || null;
+	}
 
-  formatTagLabel(tag) {
-    if (!tag || !tag.value) return "";
-    if (tag.kind === "chapter") return `Kap. ${tag.value}`;
-    if (tag.kind === "number") return `#${tag.value}`;
-    return tag.value;
-  }
+	formatTagLabel(tag) {
+		if (!tag || !tag.value) return "";
+		if (tag.kind === "chapter") return `Kap. ${tag.value}`;
+		if (tag.kind === "number") return `#${tag.value}`;
+		return tag.value;
+	}
 
-  renderTagRow(entry, fallback = null, { excludeKinds = [] } = {}) {
-    const primaryTags = tagList(entry).filter((tag) => !excludeKinds.includes(tag.kind));
-    const fallbackTags = fallback
-      ? tagList(fallback).filter((tag) => !excludeKinds.includes(tag.kind))
-      : [];
-    const merged = [];
-    const seen = new Set();
+	renderTagRow(entry, fallback = null, { excludeKinds = [] } = {}) {
+		const primaryTags = tagList(entry).filter(
+			(tag) => !excludeKinds.includes(tag.kind),
+		);
+		const fallbackTags = fallback
+			? tagList(fallback).filter((tag) => !excludeKinds.includes(tag.kind))
+			: [];
+		const merged = [];
+		const seen = new Set();
 
-    [...primaryTags, ...fallbackTags].forEach((tag) => {
-      const key = `${tag.kind}:${String(tag.value).toLowerCase()}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      merged.push(tag);
-    });
+		[...primaryTags, ...fallbackTags].forEach((tag) => {
+			const key = `${tag.kind}:${String(tag.value).toLowerCase()}`;
+			if (seen.has(key)) return;
+			seen.add(key);
+			merged.push(tag);
+		});
 
-    if (!merged.length) return "";
-    const chips = merged
-      .map(
-        (tag) =>
-          `<span class="tag-chip ${tag.kind}">${this.parseContent(this.formatTagLabel(tag))}</span>`,
-      )
-      .join("");
-    return `<div class="tag-row">${chips}</div>`;
-  }
+		if (!merged.length) return "";
+		const chips = merged
+			.map(
+				(tag) =>
+					`<span class="tag-chip ${tag.kind}">${this.parseContent(this.formatTagLabel(tag))}</span>`,
+			)
+			.join("");
+		return `<div class="tag-row">${chips}</div>`;
+	}
 
-  loadGlobalStyles() {
-    return new Promise((resolve, reject) => {
-      // Use the version matching your installed package, or fallback to latest
-      const version = (typeof katex !== "undefined" && katex.version) ? katex.version : "0.16.10";
-      const url = `https://cdn.jsdelivr.net/npm/katex@${version}/dist/katex.min.css`;
-      
-      // Check if it's already there
-      if (document.querySelector(`link[href="${url}"]`)) {
-        return resolve();
-      }
+	loadGlobalStyles() {
+		return new Promise((resolve, reject) => {
+			// Use the version matching your installed package, or fallback to latest
+			const version =
+				typeof katex !== "undefined" && katex.version
+					? katex.version
+					: "0.16.10";
+			const url = `https://cdn.jsdelivr.net/npm/katex@${version}/dist/katex.min.css`;
 
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = url;
-      link.crossOrigin = "anonymous"; // Important for fonts
-      
-      link.onload = () => resolve();
-      link.onerror = () => reject(new Error(`Failed to load KaTeX CSS from ${url}`));
+			// Check if it's already there
+			if (document.querySelector(`link[href="${url}"]`)) {
+				return resolve();
+			}
 
-      document.head.appendChild(link);
-    });
-  }
+			const link = document.createElement("link");
+			link.rel = "stylesheet";
+			link.href = url;
+			link.crossOrigin = "anonymous"; // Important for fonts
 
-  render() {
-    if (!this.shadowRoot) return;
-    const proofSteps = this.proofSteps;
-    const sectionCount = this.stepCount;
-    const hasSteps = sectionCount > 0;
-    const hasStarted = this.hasStarted && hasSteps;
-    const showStartScreen = !hasStarted;
-    const activeSection = this.getActiveSection();
-    const title = this.animation?.proof?.title || this.animation?.scene || "Theorem";
-    const description =
-      this.animation?.proof?.description ||
-      this.animation?.source ||
-      "This theorem has no descripiton yet.";
-    const numberTag = this.getNumberTag(this.animation, this.animation?.proof);
-    const numberLabel = numberTag ? `<span class="number-label">${this.parseContent(numberTag.value)}</span>` : "";
-    const tagRow = this.renderTagRow(this.animation, this.animation?.proof, { excludeKinds: ["number"] });
-    const theoremHtml = this.parseContent(
-      this.theoremStatement || "Tato věta zatím nemá formulovaný výrok.",
-    );
-    const claim = this.activeClaim;
-    const claimLabel = claim?.label || claim?.id || "";
-    const claimStatement = claim?.statement ? this.parseContent(claim.statement) : null;
-    const claimTabs = this.renderClaimTabs();
-    const claimTabsBlock = claimTabs
-      ? `
+			link.onload = () => resolve();
+			link.onerror = () =>
+				reject(new Error(`Failed to load KaTeX CSS from ${url}`));
+
+			document.head.appendChild(link);
+		});
+	}
+
+	render() {
+		if (!this.shadowRoot) return;
+		const proofSteps = this.proofSteps;
+		const sectionCount = this.stepCount;
+		const hasSteps = sectionCount > 0;
+		const hasStarted = this.hasStarted && hasSteps;
+		const showStartScreen = !hasStarted;
+		const activeSection = this.getActiveSection();
+		const title =
+			this.animation?.proof?.title || this.animation?.scene || "Theorem";
+		const description =
+			this.animation?.proof?.description ||
+			this.animation?.source ||
+			"This theorem has no descripiton yet.";
+		const numberTag = this.getNumberTag(this.animation, this.animation?.proof);
+		const numberLabel = numberTag
+			? `<span class="number-label">${this.parseContent(numberTag.value)}</span>`
+			: "";
+		const tagRow = this.renderTagRow(this.animation, this.animation?.proof, {
+			excludeKinds: ["number"],
+		});
+		const theoremHtml = this.parseContent(
+			this.theoremStatement || "Tato věta zatím nemá formulovaný výrok.",
+		);
+		const claim = this.activeClaim;
+		const claimLabel = claim?.label || claim?.id || "";
+		const claimStatement = claim?.statement
+			? this.parseContent(claim.statement)
+			: null;
+		const claimTabs = this.renderClaimTabs();
+		const claimTabsBlock = claimTabs
+			? `
         <div class="claim-tabs-wrapper">
           <span class="claim-tabs-label">Vyber část důkazu:</span>
           ${claimTabs}
         </div>
       `
-      : "";
-    const startNote = proofSteps.length > 0
-      ? "Vyber část věty a spusť přehrávání kroku po kroku."
-      : "Přidej formální kroky do .proof.json, aby bylo co přehrát.";
+			: "";
+		const startNote =
+			proofSteps.length > 0
+				? "Vyber část věty a spusť přehrávání kroku po kroku."
+				: "Přidej formální kroky do .proof.json, aby bylo co přehrát.";
 
-    const transcript =
-      hasStarted && proofSteps.length > 0
-        ? this.renderTranscript(proofSteps)
-        : `
+		const transcript =
+			hasStarted && proofSteps.length > 0
+				? this.renderTranscript(proofSteps)
+				: `
           <div class="start-card">
             <p class="eyebrow">Dokazované tvrzení</p>
             <h2 class="start-title">
               ${title}
               ${
-                claimLabel
-                  ? `<span class="claim-heading">${this.parseContent(claimLabel)}</span>`
-                  : ""
-              }
+								claimLabel
+									? `<span class="claim-heading">${this.parseContent(claimLabel)}</span>`
+									: ""
+							}
             </h2>
             <div class="theorem-statement">
               ${claimStatement || theoremHtml}
@@ -456,26 +519,28 @@ class ProofViewer extends HTMLElement {
             <p class="start-note">${startNote}</p>
           </div>
         `;
-    const rawJustification = proofSteps[this.currentSectionIndex]?.justification || activeSection?.description || "";
-    const currentJustification = this.filterCurrentOnly(rawJustification, true);
-    const navSnippet = hasStarted ? currentJustification : null;
-    const navLabel = hasStarted
-      ? `
-        <span class="nav-explain" aria-label="Vysvětlení kroku">
+		const rawJustification =
+			proofSteps[this.currentSectionIndex]?.justification || "";
+		const currentJustification = this.filterCurrentOnly(rawJustification, true);
+		const navSnippet = hasStarted ? currentJustification : null;
+		const hasJustification = Boolean(navSnippet && navSnippet.trim());
+		const navLabel = hasStarted
+			? `
+        <span class="nav-explain ${hasJustification ? "" : "muted"}" aria-label="Vysvětlení kroku">
           Vysvětlení
           <span class="hover-card">${this.parseContent(navSnippet || "Tento krok zatím nemá vysvětlení.")}</span>
         </span>
         <span class="nav-count">${`${this.currentSectionIndex + 1}/${sectionCount || 1}`}</span>
       `
-      : "";
+			: "";
 
-    const progressPrimary = sectionCount
-      ? hasStarted
-        ? `${this.currentSectionIndex + 1}/${sectionCount} steps`
-        : `${sectionCount} krok${sectionCount === 1 ? "" : sectionCount >= 5 ? "ů" : "y"} připraveno`
-      : "Waiting for steps";
-    const progressSecondary = hasStarted ? `${this.progress}%` : "Ready";
-    const progressBlock = `
+		const progressPrimary = sectionCount
+			? hasStarted
+				? `${this.currentSectionIndex + 1}/${sectionCount} steps`
+				: `${sectionCount} krok${sectionCount === 1 ? "" : sectionCount >= 5 ? "ů" : "y"} připraveno`
+			: "Waiting for steps";
+		const progressSecondary = hasStarted ? `${this.progress}%` : "Ready";
+		const progressBlock = `
       <div class="progress-block" aria-label="Progress ${sectionCount ? `(step ${this.currentSectionIndex + 1} of ${sectionCount})` : ""}">
         <div class="progress-track">
           <div class="progress-fill"></div>
@@ -487,12 +552,15 @@ class ProofViewer extends HTMLElement {
       </div>
     `;
 
-    const videoBody =
-      activeSection && activeSection.url
-        ? `
+		const posterAttr = this.lastFramePoster
+			? ` poster="${this.lastFramePoster}"`
+			: "";
+		const videoBody =
+			activeSection && activeSection.url
+				? `
             <div class="player">
               <div class="video-frame">
-                <video key="${activeSection.id}" preload="metadata" src="${activeSection.url}" aria-label="Manim section" muted autoplay playsinline></video>
+                <video key="${activeSection.id}" preload="metadata" src="${activeSection.url}"${posterAttr} aria-label="Manim section" muted autoplay playsinline></video>
               </div>
               <div class="player-meta">
                 <div class="player-actions">
@@ -501,9 +569,10 @@ class ProofViewer extends HTMLElement {
               </div>
             </div>
           `
-        : `<p class="notice">No section video available. Add \`next_section()\` calls and rerun \`npm run build:proofs\`.</p>`;
-    const navButtons = hasStarted && hasSteps
-      ? `
+				: `<p class="notice">No section video available. Add \`next_section()\` calls and rerun \`npm run build:proofs\`.</p>`;
+		const navButtons =
+			hasStarted && hasSteps
+				? `
         <div class="nav-buttons">
           <button class="nav-btn subtle" data-nav="prev-section" aria-label="Previous step" ${this.currentSectionIndex === 0 ? "disabled" : ""}>Previous</button>
           <button class="nav-btn ghost" data-nav="restart-proof">Restart</button>
@@ -511,29 +580,34 @@ class ProofViewer extends HTMLElement {
           <button class="nav-btn accent" data-nav="next-section" aria-label="Next step" ${sectionCount && this.currentSectionIndex < sectionCount - 1 ? "" : "disabled"}>Next</button>
         </div>
       `
-      : `
+				: `
         <div class="nav-buttons">
           <button class="nav-btn ghost" data-nav="start-autoplay" aria-label="Autoplay proof" ${sectionCount > 1 ? "" : "disabled"}>Autoplay</button>
           <button class="nav-btn ghost" data-nav="start-proof" aria-label="Start theorem playback" ${hasSteps ? "" : "disabled"}>Spustit přehrávání</button>
         </div>
       `;
 
-    const navRow = `
+		const navRow = `
       <div class="nav-row ${hasStarted && hasSteps ? "" : "start"}">
         ${navButtons}
       </div>
     `;
-    const explanationBlock = navLabel ? `<div class="nav-label explanation">${navLabel}</div>` : "";
-    const controlsRow = `
+		const explanationBlock = navLabel
+			? `<div class="nav-label explanation${hasJustification ? "" : " missing"}">${navLabel}</div>`
+			: "";
+		const controlsRow = `
       <div class="controls-row">
         <div class="controls-left">${navRow}</div>
         <div class="controls-right">${progressBlock}</div>
       </div>
     `;
 
-    const transcriptClass = showStartScreen || proofSteps.length === 0 ? "transcript start" : "transcript";
+		const transcriptClass =
+			showStartScreen || proofSteps.length === 0
+				? "transcript start"
+				: "transcript";
 
-    this.shadowRoot.innerHTML = `
+		this.shadowRoot.innerHTML = `
       <style>
         /* STYLE LOADING STRATEGY:
            1. Preferred: Serve 'katex.min.css' locally and point the URL below to it.
@@ -803,6 +877,10 @@ class ProofViewer extends HTMLElement {
         .nav-label.explanation {
           margin-top: 4px;
         }
+        .nav-label.explanation.missing {
+          opacity: 0.55;
+          background: rgba(148, 163, 184, 0.08);
+        }
         .nav-explain {
           position: relative;
           display: inline-flex;
@@ -811,6 +889,9 @@ class ProofViewer extends HTMLElement {
           color: #e2e8f0;
           font-weight: 600;
           cursor: default;
+        }
+        .nav-explain.muted {
+          color: #94a3b8;
         }
         .nav-explain::before {
           content: "ℹ";
@@ -1035,96 +1116,113 @@ class ProofViewer extends HTMLElement {
       </section>
     `;
 
-    this.bindEvents();
-    this.bindClaimTabs();
-    this.bindVideoActions();
-    this.queueAutoplayTick();
-    this.scrollToActive();
-    this.applyRequestedStep();
-  }
+		this.bindEvents();
+		this.bindClaimTabs();
+		this.bindVideoActions();
+		this.queueAutoplayTick();
+		this.scrollToActive();
+		this.applyRequestedStep();
+	}
 
-  applyRequestedStep() {
-    if (this.pendingStepIndex === null || this.pendingStepIndex === undefined) return;
-    if (this.stepCount <= 0) return;
-    const targetIndex = this.clampIndex(this.pendingStepIndex);
-    this.pendingStepIndex = null;
-    this.setSection(targetIndex, { silent: true });
-  }
+	applyRequestedStep() {
+		if (this.pendingStepIndex === null || this.pendingStepIndex === undefined)
+			return;
+		if (this.stepCount <= 0) return;
+		const targetIndex = this.clampIndex(this.pendingStepIndex);
+		this.pendingStepIndex = null;
+		this.setSection(targetIndex, { silent: true });
+	}
 
-  scrollToActive() {
-    // Smoothly scroll to the active revealed sentence so it stays in view
-    if (!this.hasStarted) return;
-    const active = this.shadowRoot.querySelector(".flow-sentence.active");
-    if (active) {
-      active.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  }
+	scrollToActive() {
+		// Smoothly scroll to the active revealed sentence so it stays in view
+		if (!this.hasStarted) return;
+		const active = this.shadowRoot.querySelector(".flow-sentence.active");
+		if (active) {
+			active.scrollIntoView({ behavior: "smooth", block: "nearest" });
+		}
+	}
 
-  bindEvents() {
-    const prev = this.shadowRoot.querySelector('[data-nav="prev-section"]');
-    const next = this.shadowRoot.querySelector('[data-nav="next-section"]');
-    const back = this.shadowRoot.querySelector('[data-nav="back-menu"]');
-    const start = this.shadowRoot.querySelector('[data-nav="start-proof"]');
-    const startAutoplay = this.shadowRoot.querySelector('[data-nav="start-autoplay"]');
-    const restart = this.shadowRoot.querySelector('[data-nav="restart-proof"]');
-    const toggleAutoplay = this.shadowRoot.querySelector('[data-nav="toggle-autoplay"]');
+	bindEvents() {
+		const prev = this.shadowRoot.querySelector('[data-nav="prev-section"]');
+		const next = this.shadowRoot.querySelector('[data-nav="next-section"]');
+		const back = this.shadowRoot.querySelector('[data-nav="back-menu"]');
+		const start = this.shadowRoot.querySelector('[data-nav="start-proof"]');
+		const startAutoplay = this.shadowRoot.querySelector(
+			'[data-nav="start-autoplay"]',
+		);
+		const restart = this.shadowRoot.querySelector('[data-nav="restart-proof"]');
+		const toggleAutoplay = this.shadowRoot.querySelector(
+			'[data-nav="toggle-autoplay"]',
+		);
 
-    if (prev) prev.addEventListener("click", () => {
-      this.stopAutoplay(false);
-      this.changeSection(-1);
-    });
-    if (next) next.addEventListener("click", () => {
-      this.stopAutoplay(false);
-      this.changeSection(1);
-    });
-    if (back) back.addEventListener("click", () => {
-      this.stopAutoplay();
-      this.dispatchEvent(new CustomEvent("back-to-menu", { bubbles: true, composed: true }));
-    });
-    if (start) start.addEventListener("click", () => {
-      this.stopAutoplay(false);
-      this.startProof(0);
-    });
-    if (startAutoplay) startAutoplay.addEventListener("click", () => this.startAutoplay());
-    if (restart) restart.addEventListener("click", () => {
-      this.stopAutoplay(false);
-      this.hasStarted = false;
-      this.currentSectionIndex = 0;
-      this.render();
-      this.emitStepChange(null);
-    });
-    if (toggleAutoplay) toggleAutoplay.addEventListener("click", () => this.toggleAutoplay());
-  }
+		if (prev)
+			prev.addEventListener("click", () => {
+				this.stopAutoplay(false);
+				this.changeSection(-1);
+			});
+		if (next)
+			next.addEventListener("click", () => {
+				this.stopAutoplay(false);
+				this.changeSection(1);
+			});
+		if (back)
+			back.addEventListener("click", () => {
+				this.stopAutoplay();
+				this.dispatchEvent(
+					new CustomEvent("back-to-menu", { bubbles: true, composed: true }),
+				);
+			});
+		if (start)
+			start.addEventListener("click", () => {
+				this.stopAutoplay(false);
+				this.startProof(0);
+			});
+		if (startAutoplay)
+			startAutoplay.addEventListener("click", () => this.startAutoplay());
+		if (restart)
+			restart.addEventListener("click", () => {
+				this.stopAutoplay(false);
+				this.hasStarted = false;
+				this.currentSectionIndex = 0;
+				this.lastFramePoster = null;
+				this.render();
+				this.emitStepChange(null);
+			});
+		if (toggleAutoplay)
+			toggleAutoplay.addEventListener("click", () => this.toggleAutoplay());
+	}
 
-  bindClaimTabs() {
-    this.shadowRoot.querySelectorAll("[data-claim-id]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const targetAnim = button.getAttribute("data-claim-target");
-        const claimId = button.getAttribute("data-claim-id");
-        if (targetAnim && targetAnim !== this.animation?.id) {
-          this.dispatchEvent(
-            new CustomEvent("claim-change", {
-              detail: { animationId: targetAnim, claimId },
-              bubbles: true,
-              composed: true,
-            }),
-          );
-          return;
-        }
-      });
-    });
-  }
+	bindClaimTabs() {
+		this.shadowRoot.querySelectorAll("[data-claim-id]").forEach((button) => {
+			button.addEventListener("click", () => {
+				const targetAnim = button.getAttribute("data-claim-target");
+				const claimId = button.getAttribute("data-claim-id");
+				if (targetAnim && targetAnim !== this.animation?.id) {
+					this.dispatchEvent(
+						new CustomEvent("claim-change", {
+							detail: { animationId: targetAnim, claimId },
+							bubbles: true,
+							composed: true,
+						}),
+					);
+					return;
+				}
+			});
+		});
+	}
 
-  bindVideoActions() {
-    const video = this.shadowRoot.querySelector("video");
-    const replayBtn = this.shadowRoot.querySelector('[data-video-action="replay"]');
-    if (video && replayBtn) {
-      replayBtn.addEventListener("click", () => {
-        video.currentTime = 0;
-        video.play();
-      });
-    }
-  }
+	bindVideoActions() {
+		const video = this.shadowRoot.querySelector("video");
+		const replayBtn = this.shadowRoot.querySelector(
+			'[data-video-action="replay"]',
+		);
+		if (video && replayBtn) {
+			replayBtn.addEventListener("click", () => {
+				video.currentTime = 0;
+				video.play();
+			});
+		}
+	}
 }
 
 customElements.define("proof-viewer", ProofViewer);

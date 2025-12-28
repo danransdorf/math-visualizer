@@ -2,83 +2,87 @@ import { renderRichText } from "../utils/rich-text.js";
 import { tagList } from "../utils/tags.js";
 
 class DefinitionViewer extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: "open" });
-    this._definition = null;
-    this.currentSectionIndex = 0;
-  }
+	constructor() {
+		super();
+		this.attachShadow({ mode: "open" });
+		this._definition = null;
+		this.currentSectionIndex = 0;
+	}
 
-  connectedCallback() {
-    this.render();
-  }
+	connectedCallback() {
+		this.render();
+	}
 
-  set definition(value) {
-    this._definition = value;
-    this.currentSectionIndex = 0;
-    this.render();
-  }
+	set definition(value) {
+		this._definition = value;
+		this.currentSectionIndex = 0;
+		this.render();
+	}
 
-  get definition() {
-    return this._definition;
-  }
+	get definition() {
+		return this._definition;
+	}
 
-  get sections() {
-    const secs = this.definition?.animation?.sections;
-    return Array.isArray(secs) ? secs : [];
-  }
+	get sections() {
+		const secs = this.definition?.animation?.sections;
+		return Array.isArray(secs) ? secs : [];
+	}
 
-  get hasSections() {
-    return this.sections.length > 0;
-  }
+	get hasSections() {
+		return this.sections.length > 0;
+	}
 
-  clampSection(index) {
-    if (!this.hasSections) return 0;
-    return Math.min(Math.max(index, 0), this.sections.length - 1);
-  }
+	clampSection(index) {
+		if (!this.hasSections) return 0;
+		return Math.min(Math.max(index, 0), this.sections.length - 1);
+	}
 
-  changeSection(delta) {
-    this.currentSectionIndex = this.clampSection(this.currentSectionIndex + delta);
-    this.render();
-  }
+	changeSection(delta) {
+		this.currentSectionIndex = this.clampSection(
+			this.currentSectionIndex + delta,
+		);
+		this.render();
+	}
 
-  get activeSection() {
-    if (!this.hasSections) return null;
-    return this.sections[this.clampSection(this.currentSectionIndex)];
-  }
+	get activeSection() {
+		if (!this.hasSections) return null;
+		return this.sections[this.clampSection(this.currentSectionIndex)];
+	}
 
-  parseContent(text) {
-    return renderRichText(text);
-  }
+	parseContent(text) {
+		return renderRichText(text);
+	}
 
-  getNumberTag(entry) {
-    return tagList(entry).find((tag) => tag.kind === "number") || null;
-  }
+	getNumberTag(entry) {
+		return tagList(entry).find((tag) => tag.kind === "number") || null;
+	}
 
-  formatTagLabel(tag) {
-    if (!tag || !tag.value) return "";
-    if (tag.kind === "chapter") return `Kap. ${tag.value}`;
-    if (tag.kind === "number") return `#${tag.value}`;
-    return tag.value;
-  }
+	formatTagLabel(tag) {
+		if (!tag || !tag.value) return "";
+		if (tag.kind === "chapter") return `Kap. ${tag.value}`;
+		if (tag.kind === "number") return `#${tag.value}`;
+		return tag.value;
+	}
 
-  renderTagRow(entry, { excludeKinds = [] } = {}) {
-    const tags = tagList(entry).filter((tag) => !excludeKinds.includes(tag.kind));
-    if (!tags.length) return "";
-    const chips = tags
-      .map(
-        (tag) =>
-          `<span class="tag-chip ${tag.kind}">${this.parseContent(this.formatTagLabel(tag))}</span>`,
-      )
-      .join("");
-    return `<div class="tag-row">${chips}</div>`;
-  }
+	renderTagRow(entry, { excludeKinds = [] } = {}) {
+		const tags = tagList(entry).filter(
+			(tag) => !excludeKinds.includes(tag.kind),
+		);
+		if (!tags.length) return "";
+		const chips = tags
+			.map(
+				(tag) =>
+					`<span class="tag-chip ${tag.kind}">${this.parseContent(this.formatTagLabel(tag))}</span>`,
+			)
+			.join("");
+		return `<div class="tag-row">${chips}</div>`;
+	}
 
-  render() {
-    if (!this.shadowRoot) return;
-    const def = this.definition;
-    if (!def) {
-      this.shadowRoot.innerHTML = `
+	render() {
+		if (!this.shadowRoot) return;
+		const def = this.definition;
+		if (!def) {
+			this.shadowRoot.innerHTML = `
         <style>
           :host { display: block; }
           .shell { padding: 24px; border-radius: 16px; border: 1px solid rgba(148,163,184,0.2); background: rgba(10,16,32,0.9); color: #e2e8f0; }
@@ -89,39 +93,43 @@ class DefinitionViewer extends HTMLElement {
           <button class="nav-btn" data-nav="back-menu">Zpět do menu</button>
         </section>
       `;
-      this.bindEvents();
-      return;
-    }
+			this.bindEvents();
+			return;
+		}
 
-    const aliases =
-      Array.isArray(def.alsoKnownAs) && def.alsoKnownAs.length
-        ? def.alsoKnownAs.map((alias) => this.parseContent(alias)).join(", ")
-        : "";
-    const notation = def.notation
-      ? `<div class="badge-row">
+		const aliases =
+			Array.isArray(def.alsoKnownAs) && def.alsoKnownAs.length
+				? def.alsoKnownAs.map((alias) => this.parseContent(alias)).join(", ")
+				: "";
+		const notation = def.notation
+			? `<div class="badge-row">
           <span class="pill math-text">${this.parseContent(def.notation)}</span>
           ${aliases ? `<span class="muted-label aka">AKA: <strong class="math-text">${aliases}</strong></span>` : ""}
         </div>`
-      : aliases
-        ? `<div class="badge-row">
+			: aliases
+				? `<div class="badge-row">
             <span class="muted-label aka">AKA: <strong class="math-text">${aliases}</strong></span>
           </div>`
-        : "";
-    const definitionHtml = this.parseContent(def.definition || "Tato definice zatím chybí.");
-    const exampleHtml = def.example ? this.parseContent(def.example) : "";
-    const numberTag = this.getNumberTag(def);
-    const numberLabel = numberTag ? `<p class="number-label">${this.parseContent(numberTag.value)}</p>` : "";
-    const tagRow = this.renderTagRow(def, { excludeKinds: ["number"] });
+				: "";
+		const definitionHtml = this.parseContent(
+			def.definition || "Tato definice zatím chybí.",
+		);
+		const exampleHtml = def.example ? this.parseContent(def.example) : "";
+		const numberTag = this.getNumberTag(def);
+		const numberLabel = numberTag
+			? `<p class="number-label">${this.parseContent(numberTag.value)}</p>`
+			: "";
+		const tagRow = this.renderTagRow(def, { excludeKinds: ["number"] });
 
-    const activeSection = this.activeSection;
-    const sectionCount = this.sections.length;
-    const videoUrl = activeSection?.url || def.animation?.url || null;
-    const videoLabelHtml = this.parseContent(
-      activeSection?.name || def.animation?.name || def.term || "Animation",
-    );
+		const activeSection = this.activeSection;
+		const sectionCount = this.sections.length;
+		const videoUrl = activeSection?.url || def.animation?.url || null;
+		const videoLabelHtml = this.parseContent(
+			activeSection?.name || def.animation?.name || def.term || "Animation",
+		);
 
-    const sectionNav = this.hasSections
-      ? `
+		const sectionNav = this.hasSections
+			? `
         <div class="nav-row">
           <button class="nav-btn subtle" data-nav="prev-section" aria-label="Previous section" ${this.currentSectionIndex === 0 ? "disabled" : ""}>Previous</button>
           <div class="nav-label">
@@ -133,10 +141,10 @@ class DefinitionViewer extends HTMLElement {
           </div>
         </div>
       `
-      : "";
+			: "";
 
-    const videoBody = videoUrl
-      ? `
+		const videoBody = videoUrl
+			? `
         <div class="player">
           <div class="video-frame">
             <video preload="metadata" src="${videoUrl}" aria-label="Definition animation for ${def.term}" muted autoplay playsinline></video>
@@ -153,9 +161,9 @@ class DefinitionViewer extends HTMLElement {
           </div>
         </div>
       `
-      : `<p class="notice">No animation attached to this definition yet.</p>`;
+			: `<p class="notice">No animation attached to this definition yet.</p>`;
 
-    this.shadowRoot.innerHTML = `
+		this.shadowRoot.innerHTML = `
       <style>
         @import url("https://cdn.jsdelivr.net/npm/katex@0.16.27/dist/katex.min.css");
         :host { display: block; }
@@ -477,34 +485,38 @@ class DefinitionViewer extends HTMLElement {
       </section>
     `;
 
-    this.bindEvents();
-    this.bindVideoActions();
-  }
+		this.bindEvents();
+		this.bindVideoActions();
+	}
 
-  bindEvents() {
-    const prev = this.shadowRoot.querySelector('[data-nav="prev-section"]');
-    const next = this.shadowRoot.querySelector('[data-nav="next-section"]');
-    const back = this.shadowRoot.querySelector('[data-nav="back-menu"]');
+	bindEvents() {
+		const prev = this.shadowRoot.querySelector('[data-nav="prev-section"]');
+		const next = this.shadowRoot.querySelector('[data-nav="next-section"]');
+		const back = this.shadowRoot.querySelector('[data-nav="back-menu"]');
 
-    if (prev) prev.addEventListener("click", () => this.changeSection(-1));
-    if (next) next.addEventListener("click", () => this.changeSection(1));
-    if (back) {
-      back.addEventListener("click", () => {
-        this.dispatchEvent(new CustomEvent("back-to-menu", { bubbles: true, composed: true }));
-      });
-    }
-  }
+		if (prev) prev.addEventListener("click", () => this.changeSection(-1));
+		if (next) next.addEventListener("click", () => this.changeSection(1));
+		if (back) {
+			back.addEventListener("click", () => {
+				this.dispatchEvent(
+					new CustomEvent("back-to-menu", { bubbles: true, composed: true }),
+				);
+			});
+		}
+	}
 
-  bindVideoActions() {
-    const video = this.shadowRoot.querySelector("video");
-    const replayBtn = this.shadowRoot.querySelector('[data-video-action="replay"]');
-    if (video && replayBtn) {
-      replayBtn.addEventListener("click", () => {
-        video.currentTime = 0;
-        video.play();
-      });
-    }
-  }
+	bindVideoActions() {
+		const video = this.shadowRoot.querySelector("video");
+		const replayBtn = this.shadowRoot.querySelector(
+			'[data-video-action="replay"]',
+		);
+		if (video && replayBtn) {
+			replayBtn.addEventListener("click", () => {
+				video.currentTime = 0;
+				video.play();
+			});
+		}
+	}
 }
 
 customElements.define("definition-viewer", DefinitionViewer);

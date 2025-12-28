@@ -1,47 +1,47 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap");
 
 :root {
-  color-scheme: light;
-  --bg: #0f172a;
-  --panel: #0b1222;
-  --panel-strong: #0a101d;
-  --muted: #cbd5e1;
-  --subtle: #94a3b8;
-  --accent: #0ea5e9;
-  --accent-strong: #0ea5e9;
-  --glow: #67e8f9;
-  --text-regular: #c3cfe0;
-  --text-strong: #e2e8f0;
-  --radius: 16px;
-  --shadow: 0 20px 60px rgba(8, 47, 73, 0.35);
+	color-scheme: light;
+	--bg: #0f172a;
+	--panel: #0b1222;
+	--panel-strong: #0a101d;
+	--muted: #cbd5e1;
+	--subtle: #94a3b8;
+	--accent: #0ea5e9;
+	--accent-strong: #0ea5e9;
+	--glow: #67e8f9;
+	--text-regular: #c3cfe0;
+	--text-strong: #e2e8f0;
+	--radius: 16px;
+	--shadow: 0 20px 60px rgba(8, 47, 73, 0.35);
 }
 
 *,
 *::before,
 *::after {
-  box-sizing: border-box;
+	box-sizing: border-box;
 }
 
 body {
-  margin: 0;
-  min-height: 100vh;
-  padding: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: "DM Sans", "Segoe UI", sans-serif;
-  background:
-    radial-gradient(120% 80% at 20% 20%, rgba(14, 165, 233, 0.2), transparent),
-    radial-gradient(60% 60% at 80% 0%, rgba(14, 165, 233, 0.25), transparent),
-    linear-gradient(145deg, #0a1222 0%, #0f172a 70%);
-  color: var(--text-strong);
+	margin: 0;
+	min-height: 100vh;
+	padding: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-family: "DM Sans", "Segoe UI", sans-serif;
+	background:
+		radial-gradient(120% 80% at 20% 20%, rgba(14, 165, 233, 0.2), transparent),
+		radial-gradient(60% 60% at 80% 0%, rgba(14, 165, 233, 0.25), transparent),
+		linear-gradient(145deg, #0a1222 0%, #0f172a 70%);
+	color: var(--text-strong);
 }
 
 ::selection {
-  background: rgba(14, 165, 233, 0.25);
-  color: #e2e8f0;
+	background: rgba(14, 165, 233, 0.25);
+	color: #e2e8f0;
 }
 
 a {
-  color: var(--accent);
+	color: var(--accent);
 }

@@ -6,7 +6,7 @@
     "chapter": "1",
     "number": "1.1"
   },
-  "statement": "Nechť $X$ je množina a $\\mathcal{A}$ je neprázdný systém množin. Pak platí\n$$ \\begin{aligned} &\\bullet X \\setminus \\bigcup \\mathcal{A} = \\bigcap \\{X \\setminus A; A \\in \\mathcal{A}\\} \\quad (i) \\\\[1em] &\\bullet X \\setminus \\bigcap \\mathcal{A} = \\bigcup \\{X \\setminus A; A \\in \\mathcal{A}\\}. \\quad (ii) \\end{aligned} $$",
+  "statement": "Nechť $X$ je množina a $\\mathcal{A}$ je neprázdný systém množin. Pak platí:\n$$ \\begin{aligned} &\\bullet \\quad X \\setminus \\bigcup \\mathcal{A} = \\bigcap \\{X \\setminus A; A \\in \\mathcal{A}\\} \\quad (i) \\\\[1em] &\\bullet \\quad X \\setminus \\bigcap \\mathcal{A} = \\bigcup \\{X \\setminus A; A \\in \\mathcal{A}\\}. \\quad (ii) \\end{aligned} $$",
   "claims": [
     {
       "id": "1",
@@ -27,8 +27,7 @@
           "justification": "$x \\in X$ a zároveň $x \\notin A$. Pak z definice doplňku množin platí $x \\in X \\setminus A$."
         },
         {
-          "statement": "Protože $x$ leží v doplňku každé množiny, musí ležet v jejich průniku: $$x \\in \\bigcap_{A \\in \\mathcal{A}} (X \\setminus A)$$",
-          "justification": "Definice průniku: prvek musí splňovat podmínku pro všechny množiny v systému."
+          "statement": "Protože $x$ leží v doplňku každé množiny, musí ležet v jejich průniku: $$x \\in \\bigcap_{A \\in \\mathcal{A}} (X \\setminus A) \\quad \\square$$"
         }
       ]
     },
@@ -39,20 +38,20 @@
       "statement": "$$ X \\setminus \\bigcap \\mathcal{A} = \\bigcup \\{X \\setminus A; A \\in \\mathcal{A}\\} $$",
       "steps": [
         {
-          "statement": "Nyní uvažujme $x \\in X \\setminus \\bigcap \\mathcal{A}$. Tedy $x \\notin \\bigcap \\mathcal{A}$.",
-          "justification": "To znamená, že $x$ neleží ve společném průniku všech množin."
+          "statement": "Platí, že $x \\in X$ a zároveň $x \\notin \\bigcap \\mathcal{A}$.",
+          "justification": "Z definice doplňku."
         },
         {
           "statement": "Pokud $x$ není v průniku, pak existuje alespoň jedna množina $A \\in \\mathcal{A}$ taková, že $x \\notin A$.",
-          "justification": "Negace průniku (univerzálního kvantifikátoru) vede k existenčnímu kvantifikátoru."
+          "justification": "Negace průniku vede k existenčnímu kvantifikátoru. $$ \\neg(\\forall A : x \\in A) \\Leftrightarrow \\exists A : x \\notin A $$"
         },
         {
           "statement": "Pro tuto konkrétní množinu platí $x \\in X \\setminus A$.",
           "justification": "Opět přepis pomocí definice doplňku."
         },
         {
-          "statement": "Pokud $x$ leží v doplňku alespoň jedné množiny, leží ve sjednocení doplňků: $x \\in \\bigcup_{A \\in \\mathcal{A}} (X \\setminus A)$.",
-          "justification": "Definice sjednocení: stačí, aby prvek patřil do jedné z podsystémových množin."
+          "statement": "Pokud $x$ leží v doplňku alespoň jedné množiny, leží ve sjednocení doplňků: $x \\in \\bigcup_{A \\in \\mathcal{A}} (X \\setminus A)$. $\\ \\square$",
+          "justification": "Definice sjednocení: stačí, aby prvek patřil do jedné ze sjednocovaných množin."
         }
       ]
     }

@@ -16,3 +16,4 @@ data/proofs/*.mkv
 data/proofs/*.mov
 data/proofs/*.webm
 data/proofs/.manim-tmp
+*__pycache__*

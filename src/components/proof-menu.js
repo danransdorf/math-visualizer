@@ -2,149 +2,157 @@ import { renderRichText } from "../utils/rich-text.js";
 import { tagList } from "../utils/tags.js";
 
 class ProofMenu extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: "open" });
-    this.animations = [];
-    this.definitions = [];
-    this.loading = false;
-    this.definitionsLoading = false;
-    this.error = "";
-    this.definitionsError = "";
-  }
+	constructor() {
+		super();
+		this.attachShadow({ mode: "open" });
+		this.animations = [];
+		this.definitions = [];
+		this.loading = false;
+		this.definitionsLoading = false;
+		this.error = "";
+		this.definitionsError = "";
+	}
 
-  set animations(value) {
-    this._animations = Array.isArray(value) ? value : [];
-    this.render();
-  }
+	set animations(value) {
+		this._animations = Array.isArray(value) ? value : [];
+		this.render();
+	}
 
-  get animations() {
-    return this._animations || [];
-  }
+	get animations() {
+		return this._animations || [];
+	}
 
-  set definitions(value) {
-    this._definitions = Array.isArray(value) ? value : [];
-    this.render();
-  }
+	set definitions(value) {
+		this._definitions = Array.isArray(value) ? value : [];
+		this.render();
+	}
 
-  get definitions() {
-    return this._definitions || [];
-  }
+	get definitions() {
+		return this._definitions || [];
+	}
 
-  set loading(value) {
-    this._loading = Boolean(value);
-    this.render();
-  }
+	set loading(value) {
+		this._loading = Boolean(value);
+		this.render();
+	}
 
-  get loading() {
-    return this._loading;
-  }
+	get loading() {
+		return this._loading;
+	}
 
-  set definitionsLoading(value) {
-    this._definitionsLoading = Boolean(value);
-    this.render();
-  }
+	set definitionsLoading(value) {
+		this._definitionsLoading = Boolean(value);
+		this.render();
+	}
 
-  get definitionsLoading() {
-    return this._definitionsLoading;
-  }
+	get definitionsLoading() {
+		return this._definitionsLoading;
+	}
 
-  set error(value) {
-    this._error = value || "";
-    this.render();
-  }
+	set error(value) {
+		this._error = value || "";
+		this.render();
+	}
 
-  get error() {
-    return this._error || "";
-  }
+	get error() {
+		return this._error || "";
+	}
 
-  set definitionsError(value) {
-    this._definitionsError = value || "";
-    this.render();
-  }
+	set definitionsError(value) {
+		this._definitionsError = value || "";
+		this.render();
+	}
 
-  get definitionsError() {
-    return this._definitionsError || "";
-  }
+	get definitionsError() {
+		return this._definitionsError || "";
+	}
 
-  connectedCallback() {
-    this.render();
-  }
+	connectedCallback() {
+		this.render();
+	}
 
-  parseContent(text) {
-    return renderRichText(text);
-  }
+	parseContent(text) {
+		return renderRichText(text);
+	}
 
-  getNumberTag(entry, fallback = null) {
-    const primary = tagList(entry).find((tag) => tag.kind === "number");
-    if (primary) return primary;
-    const secondary = fallback ? tagList(fallback).find((tag) => tag.kind === "number") : null;
-    return secondary || null;
-  }
+	getNumberTag(entry, fallback = null) {
+		const primary = tagList(entry).find((tag) => tag.kind === "number");
+		if (primary) return primary;
+		const secondary = fallback
+			? tagList(fallback).find((tag) => tag.kind === "number")
+			: null;
+		return secondary || null;
+	}
 
-  formatTagLabel(tag) {
-    if (!tag || !tag.value) return "";
-    if (tag.kind === "chapter") return `Kap. ${tag.value}`;
-    if (tag.kind === "number") return `#${tag.value}`;
-    return tag.value;
-  }
+	formatTagLabel(tag) {
+		if (!tag || !tag.value) return "";
+		if (tag.kind === "chapter") return `Kap. ${tag.value}`;
+		if (tag.kind === "number") return `#${tag.value}`;
+		return tag.value;
+	}
 
-  renderTagRow(entry, fallback = null, { excludeKinds = [] } = {}) {
-    const primaryTags = tagList(entry).filter((tag) => !excludeKinds.includes(tag.kind));
-    const fallbackTags = fallback
-      ? tagList(fallback).filter((tag) => !excludeKinds.includes(tag.kind))
-      : [];
-    const merged = [];
-    const seen = new Set();
+	renderTagRow(entry, fallback = null, { excludeKinds = [] } = {}) {
+		const primaryTags = tagList(entry).filter(
+			(tag) => !excludeKinds.includes(tag.kind),
+		);
+		const fallbackTags = fallback
+			? tagList(fallback).filter((tag) => !excludeKinds.includes(tag.kind))
+			: [];
+		const merged = [];
+		const seen = new Set();
 
-    [...primaryTags, ...fallbackTags].forEach((tag) => {
-      const key = `${tag.kind}:${String(tag.value).toLowerCase()}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      merged.push(tag);
-    });
+		[...primaryTags, ...fallbackTags].forEach((tag) => {
+			const key = `${tag.kind}:${String(tag.value).toLowerCase()}`;
+			if (seen.has(key)) return;
+			seen.add(key);
+			merged.push(tag);
+		});
 
-    if (!merged.length) return "";
-    const chips = merged
-      .map(
-        (tag) =>
-          `<span class="tag-chip ${tag.kind}">${this.parseContent(this.formatTagLabel(tag))}</span>`,
-      )
-      .join("");
-    return `<div class="tag-row">${chips}</div>`;
-  }
+		if (!merged.length) return "";
+		const chips = merged
+			.map(
+				(tag) =>
+					`<span class="tag-chip ${tag.kind}">${this.parseContent(this.formatTagLabel(tag))}</span>`,
+			)
+			.join("");
+		return `<div class="tag-row">${chips}</div>`;
+	}
 
-  render() {
-    if (!this.shadowRoot) return;
-    const hasAnimations = this.animations.length > 0;
-    const hasDefinitions = this.definitions.length > 0;
+	render() {
+		if (!this.shadowRoot) return;
+		const hasAnimations = this.animations.length > 0;
+		const hasDefinitions = this.definitions.length > 0;
 
-    // Group animations by theorem so multi-claim proofs show as a single card.
-    const groups = (() => {
-      const map = new Map();
-      this.animations.forEach((anim) => {
-        const theoremId = anim.theoremId || anim.id;
-        if (!map.has(theoremId)) {
-          map.set(theoremId, []);
-        }
-        map.get(theoremId).push(anim);
-      });
-      return Array.from(map.values());
-    })();
+		// Group animations by theorem so multi-claim proofs show as a single card.
+		const groups = (() => {
+			const map = new Map();
+			this.animations.forEach((anim) => {
+				const theoremId = anim.theoremId || anim.id;
+				if (!map.has(theoremId)) {
+					map.set(theoremId, []);
+				}
+				map.get(theoremId).push(anim);
+			});
+			return Array.from(map.values());
+		})();
 
-    const definitionCards = hasDefinitions
-      ? this.definitions
-          .map((def) => {
-            const notation = def.notation
-              ? `<span class="pill notation-chip">${this.parseContent(def.notation)}</span>`
-              : "";
-            const snippet = def.definition
-              ? `<p class="definition-snippet">${this.parseContent(def.definition)}</p>`
-              : "";
-            const numberTag = this.getNumberTag(def);
-            const numberLabel = numberTag ? `<span class="number-label">${this.parseContent(numberTag.value)}</span>` : "";
-            const tagRow = this.renderTagRow(def, null, { excludeKinds: ["number"] });
-            return `
+		const definitionCards = hasDefinitions
+			? this.definitions
+					.map((def) => {
+						const notation = def.notation
+							? `<span class="pill notation-chip">${this.parseContent(def.notation)}</span>`
+							: "";
+						const snippet = def.definition
+							? `<p class="definition-snippet">${this.parseContent(def.definition)}</p>`
+							: "";
+						const numberTag = this.getNumberTag(def);
+						const numberLabel = numberTag
+							? `<span class="number-label">${this.parseContent(numberTag.value)}</span>`
+							: "";
+						const tagRow = this.renderTagRow(def, null, {
+							excludeKinds: ["number"],
+						});
+						return `
               <article class="definition-card" data-open-definition="${def.id}" role="button" tabindex="0">
                 <div class="header-row">
                   <h3 class="math-text title-with-number">
@@ -157,33 +165,37 @@ class ProofMenu extends HTMLElement {
                 ${tagRow}
               </article>
             `;
-          })
-          .join("")
-      : `<p class="notice">${this.definitionsLoading ? "Looking for definitions..." : "No definitions yet. Add some to data/definitions."}</p>`;
-    const menuCards = hasAnimations
-      ? groups
-          .map((items) => {
-            const primary = items[0];
-            const title = primary.proof?.title || primary.scene || "Theorem";
-            const desc = primary.proof?.description || primary.source || "";
-            const claims = Array.from(
-              new Map(
-                items
-                  .flatMap((anim) => anim.proof?.claims || [])
-                  .map((claim) => [claim?.id || claim?.label || "", claim]),
-              ).values(),
-            ).filter(Boolean);
-            const claimPill =
-              claims.length > 1
-                ? `<span class="pill claim-pill">${claims.map((c) => c?.label || c?.id).join(" ")}</span>`
-                : "";
-            const sectionLabel = primary.sections?.length
-              ? `${primary.sections.length}&nbsp;krok${primary.sections.length === 1 ? "" : primary.sections.length >= 5 ? "ů" : "y"}`
-              : "0&nbsp;kroků";
-            const numberTag = this.getNumberTag(primary, primary.proof);
-            const numberLabel = numberTag ? `<span class="number-label">${this.parseContent(numberTag.value)}</span>` : "";
-            const tagRow = this.renderTagRow(primary, primary.proof, { excludeKinds: ["number"] });
-            return `
+					})
+					.join("")
+			: `<p class="notice">${this.definitionsLoading ? "Looking for definitions..." : "No definitions yet. Add some to data/definitions."}</p>`;
+		const menuCards = hasAnimations
+			? groups
+					.map((items) => {
+						const primary = items[0];
+						const title = primary.proof?.title || primary.scene || "Theorem";
+						const desc = primary.proof?.description || primary.source || "";
+						const claims = Array.from(
+							new Map(
+								items
+									.flatMap((anim) => anim.proof?.claims || [])
+									.map((claim) => [claim?.id || claim?.label || "", claim]),
+							).values(),
+						).filter(Boolean);
+						const claimPill =
+							claims.length > 1
+								? `<span class="pill claim-pill">${claims.map((c) => c?.label || c?.id).join(" ")}</span>`
+								: "";
+						const sectionLabel = primary.sections?.length
+							? `${primary.sections.length}&nbsp;krok${primary.sections.length === 1 ? "" : primary.sections.length >= 5 ? "ů" : "y"}`
+							: "0&nbsp;kroků";
+						const numberTag = this.getNumberTag(primary, primary.proof);
+						const numberLabel = numberTag
+							? `<span class="number-label">${this.parseContent(numberTag.value)}</span>`
+							: "";
+						const tagRow = this.renderTagRow(primary, primary.proof, {
+							excludeKinds: ["number"],
+						});
+						return `
               <article class="menu-card" data-open-animation="${primary.id}" role="button" tabindex="0">
                 <div class="header-row">
                   <h3 class="title-with-number">
@@ -199,21 +211,21 @@ class ProofMenu extends HTMLElement {
                 ${tagRow}
               </article>
             `;
-          })
-          .join("")
-      : `<p class="notice">${this.loading ? "Loading..." : "No theorems yet. Add Manim scenes and rerun the renderer."}</p>`;
+					})
+					.join("")
+			: `<p class="notice">${this.loading ? "Loading..." : "No theorems yet. Add Manim scenes and rerun the renderer."}</p>`;
 
-    const definitionsStatus = this.definitionsError
-      ? `<p class="notice warning">${this.definitionsError}</p>`
-      : "";
+		const definitionsStatus = this.definitionsError
+			? `<p class="notice warning">${this.definitionsError}</p>`
+			: "";
 
-    const status = this.error
-      ? `<p class="notice warning">${this.error}</p>`
-      : this.loading
-        ? `<p class="notice">Looking for /proofs/manifest.json ...</p>`
-        : "";
+		const status = this.error
+			? `<p class="notice warning">${this.error}</p>`
+			: this.loading
+				? `<p class="notice">Looking for /proofs/manifest.json ...</p>`
+				: "";
 
-    this.shadowRoot.innerHTML = `
+		this.shadowRoot.innerHTML = `
       <style>
         @import url("https://cdn.jsdelivr.net/npm/katex@0.16.27/dist/katex.min.css");
         :host { display: block; }
@@ -450,34 +462,46 @@ class ProofMenu extends HTMLElement {
       </div>
     `;
 
-    const handleActivate = (el, type) => {
-      const id =
-        type === "proof" ? el.dataset.openAnimation : el.dataset.openDefinition;
-      if (!id) return;
-      const eventName = type === "proof" ? "select-proof" : "select-definition";
-      this.dispatchEvent(new CustomEvent(eventName, { detail: { id }, bubbles: true, composed: true }));
-    };
+		const handleActivate = (el, type) => {
+			const id =
+				type === "proof" ? el.dataset.openAnimation : el.dataset.openDefinition;
+			if (!id) return;
+			const eventName = type === "proof" ? "select-proof" : "select-definition";
+			this.dispatchEvent(
+				new CustomEvent(eventName, {
+					detail: { id },
+					bubbles: true,
+					composed: true,
+				}),
+			);
+		};
 
-    this.shadowRoot.querySelectorAll("[data-open-animation]").forEach((card) => {
-      card.addEventListener("click", () => handleActivate(card, "proof"));
-      card.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          handleActivate(card, "proof");
-        }
-      });
-    });
+		this.shadowRoot
+			.querySelectorAll("[data-open-animation]")
+			.forEach((card) => {
+				card.addEventListener("click", () => handleActivate(card, "proof"));
+				card.addEventListener("keydown", (event) => {
+					if (event.key === "Enter" || event.key === " ") {
+						event.preventDefault();
+						handleActivate(card, "proof");
+					}
+				});
+			});
 
-    this.shadowRoot.querySelectorAll("[data-open-definition]").forEach((card) => {
-      card.addEventListener("click", () => handleActivate(card, "definition"));
-      card.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          handleActivate(card, "definition");
-        }
-      });
-    });
-  }
+		this.shadowRoot
+			.querySelectorAll("[data-open-definition]")
+			.forEach((card) => {
+				card.addEventListener("click", () =>
+					handleActivate(card, "definition"),
+				);
+				card.addEventListener("keydown", (event) => {
+					if (event.key === "Enter" || event.key === " ") {
+						event.preventDefault();
+						handleActivate(card, "definition");
+					}
+				});
+			});
+	}
 }
 
 customElements.define("proof-menu", ProofMenu);
