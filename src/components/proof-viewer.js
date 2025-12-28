@@ -1,4 +1,6 @@
 import katex from "katex";
+import { renderRichText } from "../utils/rich-text.js";
+import { tagList } from "../utils/tags.js";
 
 // If you are using a bundler (Vite/Webpack) that handles assets, 
 // you might ensure the CSS/Fonts are in your build output.
@@ -16,6 +18,7 @@ class ProofViewer extends HTMLElement {
     this.autoplayActive = false;
     this.autoplayVideo = null;
     this.autoplayEndListener = null;
+    this.pendingStepIndex = null;
     // Removed: this.katexLoaded tracking (library is now imported)
   }
 
@@ -29,6 +32,18 @@ class ProofViewer extends HTMLElement {
 
   get animation() {
     return this._animation;
+  }
+
+  set requestedStepIndex(value) {
+    if (value === null || value === undefined) {
+      this.pendingStepIndex = null;
+      return;
+    }
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      this.pendingStepIndex = parsed;
+      this.applyRequestedStep();
+    }
   }
 
   connectedCallback() {
@@ -56,7 +71,6 @@ class ProofViewer extends HTMLElement {
 
   get theoremStatement() {
     return (
-      this.animation?.proof?.theorem ||
       this.animation?.proof?.statement ||
       this.proofSteps[0]?.statement ||
       ""
@@ -101,28 +115,41 @@ class ProofViewer extends HTMLElement {
     return clampedIndex;
   }
 
-  setSection(index) {
+  emitStepChange(stepIndex = this.currentSectionIndex) {
+    this.dispatchEvent(
+      new CustomEvent("step-change", {
+        detail: {
+          stepIndex: typeof stepIndex === "number" && Number.isFinite(stepIndex) ? stepIndex : null,
+          stepNumber: typeof stepIndex === "number" && Number.isFinite(stepIndex) ? stepIndex + 1 : null,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  setSection(index, options = {}) {
+    const { silent = false } = options;
     const clampedIndex = this.clampIndex(index);
     if (!this.hasStarted) {
       this.hasStarted = true;
       this.currentSectionIndex = clampedIndex;
       this.render();
+      if (!silent) this.emitStepChange(clampedIndex);
       return;
     }
     if (clampedIndex === this.currentSectionIndex) return;
     this.currentSectionIndex = clampedIndex;
     this.render();
+    if (!silent) this.emitStepChange(clampedIndex);
   }
 
   changeSection(delta) {
     this.setSection(this.currentSectionIndex + delta);
   }
 
-  startProof(index = 0) {
-    const clampedIndex = this.clampIndex(index);
-    this.hasStarted = true;
-    this.currentSectionIndex = clampedIndex;
-    this.render();
+  startProof(index = 0, options = {}) {
+    this.setSection(index, options);
   }
 
   getActiveSection() {
@@ -232,50 +259,76 @@ class ProofViewer extends HTMLElement {
 
   /**
    * Safe Text Parser
-   * 1. Splits text by $...$ and $$...$$
-   * 2. Renders Math using bundled KaTeX
-   * 3. Escapes regular text
+   * Uses shared renderer for KaTeX + basic Markdown.
    */
   parseContent(text) {
-    if (!text) return "";
-    
-    // Split logic: Capture content inside delimiters
-    // Group 1: $$...$$ (Display), Group 2: $...$ (Inline)
-    const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[^\$]+\$)/g);
+    return renderRichText(text);
+  }
 
-    return parts.map(part => {
-      // Handle Display Mode $$...$$
-      if (part.startsWith('$$') && part.endsWith('$$')) {
-        try {
-          return katex.renderToString(part.slice(2, -2), { 
-            trust: true,
-            displayMode: true, 
-            throwOnError: false,
-            output: 'html' // Use HTML output to avoid needing MathML fonts if problematic
-          });
-        } catch (e) { return part; }
-      } 
-      // Handle Inline Mode $...$
-      else if (part.startsWith('$') && part.endsWith('$')) {
-        try {
-          return katex.renderToString(part.slice(1, -1), { 
-            trust: true,
-            displayMode: false, 
-            throwOnError: false,
-            output: 'html'
-          });
-        } catch (e) { return part; }
-      } 
-      // Handle Text
-      else {
-        return part
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;");
-      }
-    }).join('');
+  filterCurrentOnly(text, isActive) {
+    if (typeof text !== "string") return text;
+    return text.replace(/\[\[current-only\]\]([\s\S]*?)\[\[\/current-only\]\]/gi, (_, inner) =>
+      isActive ? inner : "",
+    );
+  }
+
+  renderTranscript(proofSteps) {
+    const limit = Math.min(this.currentSectionIndex + 1, proofSteps.length);
+    const stepsToRender = proofSteps.slice(0, limit);
+    if (!stepsToRender.length) return "";
+
+    const combined = stepsToRender
+      .map((proofStep, idx) => {
+        const isActive = idx === this.currentSectionIndex;
+        const rawStatement = proofStep?.statement || "This section is pending a description.";
+        const filtered = this.filterCurrentOnly(rawStatement, isActive);
+        return typeof filtered === "string" ? filtered.trim() : "";
+      })
+      .filter(Boolean)
+      .join(" ");
+
+    if (!combined) return "";
+    const html = this.parseContent(combined);
+    return `<span class="flow-sentence">${html}</span>`;
+  }
+
+  getNumberTag(entry, fallback = null) {
+    const primary = tagList(entry).find((tag) => tag.kind === "number");
+    if (primary) return primary;
+    const secondary = fallback ? tagList(fallback).find((tag) => tag.kind === "number") : null;
+    return secondary || null;
+  }
+
+  formatTagLabel(tag) {
+    if (!tag || !tag.value) return "";
+    if (tag.kind === "chapter") return `Kap. ${tag.value}`;
+    if (tag.kind === "number") return `#${tag.value}`;
+    return tag.value;
+  }
+
+  renderTagRow(entry, fallback = null, { excludeKinds = [] } = {}) {
+    const primaryTags = tagList(entry).filter((tag) => !excludeKinds.includes(tag.kind));
+    const fallbackTags = fallback
+      ? tagList(fallback).filter((tag) => !excludeKinds.includes(tag.kind))
+      : [];
+    const merged = [];
+    const seen = new Set();
+
+    [...primaryTags, ...fallbackTags].forEach((tag) => {
+      const key = `${tag.kind}:${String(tag.value).toLowerCase()}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      merged.push(tag);
+    });
+
+    if (!merged.length) return "";
+    const chips = merged
+      .map(
+        (tag) =>
+          `<span class="tag-chip ${tag.kind}">${this.parseContent(this.formatTagLabel(tag))}</span>`,
+      )
+      .join("");
+    return `<div class="tag-row">${chips}</div>`;
   }
 
   loadGlobalStyles() {
@@ -313,31 +366,27 @@ class ProofViewer extends HTMLElement {
     const hasStarted = this.hasStarted && hasSteps;
     const showStartScreen = !hasStarted;
     const activeSection = this.getActiveSection();
-    const title = this.animation?.proof?.title || this.animation?.scene || "Proof";
+    const title = this.animation?.proof?.title || this.animation?.scene || "Theorem";
     const description =
       this.animation?.proof?.description ||
       this.animation?.source ||
-      "This proof has no description yet.";
+      "This theorem has no descripiton yet.";
+    const numberTag = this.getNumberTag(this.animation, this.animation?.proof);
+    const numberLabel = numberTag ? `<span class="number-label">${this.parseContent(numberTag.value)}</span>` : "";
+    const tagRow = this.renderTagRow(this.animation, this.animation?.proof, { excludeKinds: ["number"] });
     const theoremHtml = this.parseContent(
-      this.theoremStatement || "Tento důkaz zatím nemá formulovaný výrok.",
+      this.theoremStatement || "Tato věta zatím nemá formulovaný výrok.",
     );
     const startNote = proofSteps.length > 0
-      ? "Až klikneš na „Spustit důkaz“, přehrajeme úvodní animaci a pak první krok."
+      ? "Až klikneš na „Spustit přehrávání“, přehrajeme úvodní animaci a pak první krok."
       : "Přidej formální kroky do .proof.json, aby bylo co přehrát.";
 
     const transcript =
       hasStarted && proofSteps.length > 0
-        ? proofSteps
-            .slice(0, Math.min(this.currentSectionIndex + 1, proofSteps.length))
-            .map((proofStep, idx, arr) => {
-              const isActive = idx === Math.min(arr.length - 1, this.currentSectionIndex);
-              const stepStatement = this.parseContent(proofStep?.statement || "This section is pending a description.");
-              return `<span class="flow-sentence ${isActive ? "active" : ""}">${stepStatement}</span>`;
-            })
-            .join(" ")
+        ? this.renderTranscript(proofSteps)
         : `
           <div class="start-card">
-            <p class="eyebrow">Theorem to prove</p>
+            <p class="eyebrow">Dokazované tvrzení</p>
             <h2 class="start-title">${title}</h2>
             <div class="theorem-statement">${theoremHtml}</div>
             <p class="start-note">${startNote}</p>
@@ -366,11 +415,20 @@ class ProofViewer extends HTMLElement {
           `
         : "";
 
-    const navSnippet = hasStarted
-      ? proofSteps[this.currentSectionIndex]?.statement || activeSection?.description || activeSection?.name || "Step"
-      : this.theoremStatement || "Ready to start";
+    const startCountLabel = `${sectionCount} krok${sectionCount === 1 ? "" : sectionCount >= 5 ? "ů" : "y"} připraveno`;
+    const rawJustification = proofSteps[this.currentSectionIndex]?.justification || activeSection?.description || "";
+    const currentJustification = this.filterCurrentOnly(rawJustification, true);
+    const navSnippet = hasStarted ? currentJustification : null;
     const navLabel = sectionCount
-      ? `<span class="nav-snippet">${this.parseContent(navSnippet)}</span><span class="nav-count">${hasStarted ? `${this.currentSectionIndex + 1}/${sectionCount}` : `${sectionCount} krok${sectionCount === 1 ? "" : sectionCount >= 5 ? "ů" : "y"} připraveno`}</span>`
+      ? hasStarted
+        ? `
+          <span class="nav-explain" aria-label="Vysvětlení kroku">
+            Vysvětlení
+            <span class="hover-card">${this.parseContent(navSnippet || "Tento krok zatím nemá vysvětlení.")}</span>
+          </span>
+          <span class="nav-count">${`${this.currentSectionIndex + 1}/${sectionCount}`}</span>
+        `
+        : `<span class="nav-count">${startCountLabel}</span>`
       : `<span class="nav-snippet">Žádné kroky zatím nejsou v JSONu</span>`;
 
     const activeSectionName = activeSection?.name || (showStartScreen ? "Intro" : "Section");
@@ -412,7 +470,7 @@ class ProofViewer extends HTMLElement {
           <div class="nav-label">${navLabel}</div>
           <div class="nav-actions">
             <button class="nav-btn ghost" data-nav="start-autoplay" aria-label="Autoplay proof" ${sectionCount > 1 ? "" : "disabled"}>Autoplay</button>
-            <button class="nav-btn accent" data-nav="start-proof" aria-label="Start proof" ${hasSteps ? "" : "disabled"}>Spustit důkaz</button>
+            <button class="nav-btn accent" data-nav="start-proof" aria-label="Start theorem playback" ${hasSteps ? "" : "disabled"}>Spustit přehrávání</button>
           </div>
         </div>
       `;
@@ -433,9 +491,7 @@ class ProofViewer extends HTMLElement {
         */
         @import url("https://cdn.jsdelivr.net/npm/katex@0.16.27/dist/katex.min.css"); /* Update this path to where your server hosts static assets */
         
-        :host {
-          display: block;
-        }
+        :host { display: block; }
         .shell {
           background: linear-gradient(140deg, rgba(10, 16, 32, 0.94), rgba(9, 14, 26, 0.9));
           border: 1px solid rgba(148, 163, 184, 0.25);
@@ -455,11 +511,47 @@ class ProofViewer extends HTMLElement {
           color: #e2e8f0;
           margin: 8px 0 6px;
         }
+        .number-label {
+          margin: 0 0 2px;
+          color: #94a3b8;
+          font-size: 12px;
+          letter-spacing: 0.04em;
+          display: inline-flex;
+        }
         .lede {
           margin: 0;
-          color: #cbd5e1;
+          color: var(--text-regular, #c3cfe0);
           max-width: 720px;
           line-height: 1.6;
+        }
+        .tag-row {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          margin: 6px 0 8px;
+        }
+        .tag-chip {
+          padding: 0;
+          border-radius: 0;
+          background: transparent;
+          border: none;
+          color: #8aa0bb;
+          font-size: 12px;
+          font-weight: 600;
+          white-space: nowrap;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .tag-chip::before {
+          content: "•";
+          color: rgba(148, 163, 184, 0.65);
+        }
+        .tag-chip.chapter {
+          color: #b6a4ff;
+        }
+        .tag-chip.number {
+          color: #9cd7b0;
         }
         .progress-block {
           min-width: 240px;
@@ -503,7 +595,7 @@ class ProofViewer extends HTMLElement {
           border-radius: 12px;
           border: 1px solid rgba(148, 163, 184, 0.3);
           background: rgba(255, 255, 255, 0.02);
-          color: #cbd5e1;
+          color: var(--text-regular, #c3cfe0);
           font-weight: 700;
           display: inline-flex;
           align-items: center;
@@ -542,7 +634,7 @@ class ProofViewer extends HTMLElement {
           overflow-y: auto;
           scroll-behavior: smooth;
           line-height: 1.8;
-          color: #e2e8f0;
+          color: var(--text-regular, #c3cfe0);
           font-size: 15px;
         }
         .transcript.start {
@@ -553,7 +645,7 @@ class ProofViewer extends HTMLElement {
         }
         .flow-sentence {
           display: inline;
-          color: #e2e8f0;
+          color: var(--text-regular, #c3cfe0);
         }
         .flow-sentence:not(:last-child)::after {
           content: " ";
@@ -580,6 +672,7 @@ class ProofViewer extends HTMLElement {
           background: rgba(255, 255, 255, 0.04);
           border: 1px solid rgba(148, 163, 184, 0.2);
           line-height: 1.6;
+          color: var(--text-regular, #c3cfe0);
         }
         .eyebrow {
           margin: 0;
@@ -590,7 +683,7 @@ class ProofViewer extends HTMLElement {
         }
         .start-note {
           margin: 0;
-          color: #cbd5e1;
+          color: var(--text-regular, #c3cfe0);
           line-height: 1.5;
         }
         .nav-row {
@@ -604,7 +697,7 @@ class ProofViewer extends HTMLElement {
           align-items: center;
         }
         .nav-label {
-          color: #e2e8f0;
+          color: var(--text-regular, #c3cfe0);
           font-size: 13px;
           padding: 8px 12px;
           border-radius: 12px;
@@ -615,11 +708,53 @@ class ProofViewer extends HTMLElement {
           min-width: 0;
           max-width: 100%;
           white-space: nowrap;
-          overflow: hidden;
+          overflow: visible;
           line-height: 1.4;
         }
-        .nav-snippet {
+        .nav-explain {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
           color: #e2e8f0;
+          font-weight: 600;
+          cursor: default;
+        }
+        .nav-explain::before {
+          content: "ℹ";
+          font-size: 12px;
+          color: #38bdf8;
+        }
+        .hover-card {
+          position: absolute;
+          bottom: 120%;
+          left: 0;
+          z-index: 2;
+          min-width: 220px;
+          max-width: min(480px, 70vw);
+          padding: 10px 12px;
+          border-radius: 12px;
+          background: rgba(15, 23, 42, 0.95);
+          border: 1px solid rgba(148, 163, 184, 0.25);
+          color: #c3cfe0;
+          box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+          transform-origin: bottom left;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 100ms ease, transform 100ms ease;
+          line-height: 1.5;
+          white-space: normal;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+        }
+        .nav-explain:hover .hover-card,
+        .nav-explain:focus-within .hover-card {
+          opacity: 1;
+          pointer-events: auto;
+          transform: translateY(-2px);
+        }
+        .nav-snippet {
+          color: var(--text-regular, #c3cfe0);
           display: inline-block;
           min-width: 0;
           max-width: 100%;
@@ -633,6 +768,7 @@ class ProofViewer extends HTMLElement {
           font-size: 12px;
           flex-shrink: 0;
         }
+        strong { color: var(--text-strong, #e2e8f0); }
         .nav-btn {
           border: 1px solid rgba(148, 163, 184, 0.35);
           border-radius: 999px;
@@ -781,11 +917,13 @@ class ProofViewer extends HTMLElement {
           }
         }
       </style>
-      <section class="shell" aria-label="Proof visualizer">
+      <section class="shell" aria-label="Theorem viewer">
         <header class="top">
           <div>
+            ${numberLabel}
             <h1>${title}</h1>
-            <p class="lede">${description}</p>
+            ${tagRow}
+            <p class="lede">${this.parseContent(description)}</p>
           </div>
           <div class="progress-block" aria-label="Progress ${sectionCount ? `(step ${this.currentSectionIndex + 1} of ${sectionCount})` : ""}">
             <div class="progress-track">
@@ -806,7 +944,7 @@ class ProofViewer extends HTMLElement {
               ${transcript}
             </div>
             ${navRow}
-            <button class="nav-btn" data-nav="back-menu">Menu důkazů</button>
+            <button class="nav-btn" data-nav="back-menu">Menu vět</button>
           </article>
 
           <aside class="visual-pane" aria-live="polite">
@@ -824,6 +962,15 @@ class ProofViewer extends HTMLElement {
     this.bindVideoActions();
     this.queueAutoplayTick();
     this.scrollToActive();
+    this.applyRequestedStep();
+  }
+
+  applyRequestedStep() {
+    if (this.pendingStepIndex === null || this.pendingStepIndex === undefined) return;
+    if (this.stepCount <= 0) return;
+    const targetIndex = this.clampIndex(this.pendingStepIndex);
+    this.pendingStepIndex = null;
+    this.setSection(targetIndex, { silent: true });
   }
 
   scrollToActive() {
@@ -874,6 +1021,7 @@ class ProofViewer extends HTMLElement {
       this.hasStarted = false;
       this.currentSectionIndex = 0;
       this.render();
+      this.emitStepChange(null);
     });
     if (toggleAutoplay) toggleAutoplay.addEventListener("click", () => this.toggleAutoplay());
   }

@@ -34,6 +34,26 @@ npm run build:text   # refresh manifests only (no video renders)
 - Definition entries: `data/definitions/*.json`
 - Output manifests/clips: `public/proofs/manifest.json` and `public/definitions/manifest.json`
 
+### Tagging definitions and proofs
+
+You can add optional taxonomy metadata to any definition or proof JSON. Either use a nested `tags` object or place the fields at the root; the build scripts normalize both.
+
+```json
+{
+  "term": "Sparse Matrix",
+  "tags": {
+    "subjects": ["Real Analysis"],
+    "chapter": "1",
+    "number": "3.5.4"
+  }
+}
+```
+
+Keys:
+- `subjects`: array of subjects/disciplines (string or array accepted)
+- `chapter`: chapter/section label (string or number)
+- `number`: catalogue/numbering label (e.g., "3.5.4")
+
 Manim must be installed for video renders (`npm run build:proofs`). Text-only edits don’t require Manim (`npm run build:text` or the dev watcher).***
 
 ## Acknowledgements & Solidarity

@@ -1,4 +1,5 @@
-import katex from "katex";
+import { renderRichText } from "../utils/rich-text.js";
+import { tagList } from "../utils/tags.js";
 
 class DefinitionViewer extends HTMLElement {
   constructor() {
@@ -47,42 +48,30 @@ class DefinitionViewer extends HTMLElement {
   }
 
   parseContent(text) {
-    if (!text) return "";
-    const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[^\$]+\$)/g);
+    return renderRichText(text);
+  }
 
-    return parts
-      .map((part) => {
-        if (part.startsWith("$$") && part.endsWith("$$")) {
-          try {
-            return katex.renderToString(part.slice(2, -2), {
-              trust: true,
-              displayMode: true,
-              throwOnError: false,
-              output: "html",
-            });
-          } catch (e) {
-            return part;
-          }
-        } else if (part.startsWith("$") && part.endsWith("$")) {
-          try {
-            return katex.renderToString(part.slice(1, -1), {
-              trust: true,
-              displayMode: false,
-              throwOnError: false,
-              output: "html",
-            });
-          } catch (e) {
-            return part;
-          }
-        }
-        return part
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;");
-      })
+  getNumberTag(entry) {
+    return tagList(entry).find((tag) => tag.kind === "number") || null;
+  }
+
+  formatTagLabel(tag) {
+    if (!tag || !tag.value) return "";
+    if (tag.kind === "chapter") return `Kap. ${tag.value}`;
+    if (tag.kind === "number") return `#${tag.value}`;
+    return tag.value;
+  }
+
+  renderTagRow(entry, { excludeKinds = [] } = {}) {
+    const tags = tagList(entry).filter((tag) => !excludeKinds.includes(tag.kind));
+    if (!tags.length) return "";
+    const chips = tags
+      .map(
+        (tag) =>
+          `<span class="tag-chip ${tag.kind}">${this.parseContent(this.formatTagLabel(tag))}</span>`,
+      )
       .join("");
+    return `<div class="tag-row">${chips}</div>`;
   }
 
   render() {
@@ -104,28 +93,39 @@ class DefinitionViewer extends HTMLElement {
       return;
     }
 
-    const notation = def.notation ? `<span class="pill">${def.notation}</span>` : "";
     const aliases =
       Array.isArray(def.alsoKnownAs) && def.alsoKnownAs.length
-        ? def.alsoKnownAs.join(", ")
+        ? def.alsoKnownAs.map((alias) => this.parseContent(alias)).join(", ")
         : "";
-    const aliasesRow = aliases
-      ? `<p class="muted-label">Také známo jako: <strong>${aliases}</strong></p>`
-      : "";
+    const notation = def.notation
+      ? `<div class="badge-row">
+          <span class="pill math-text">${this.parseContent(def.notation)}</span>
+          ${aliases ? `<span class="muted-label aka">AKA: <strong class="math-text">${aliases}</strong></span>` : ""}
+        </div>`
+      : aliases
+        ? `<div class="badge-row">
+            <span class="muted-label aka">AKA: <strong class="math-text">${aliases}</strong></span>
+          </div>`
+        : "";
     const definitionHtml = this.parseContent(def.definition || "Tato definice zatím chybí.");
     const exampleHtml = def.example ? this.parseContent(def.example) : "";
+    const numberTag = this.getNumberTag(def);
+    const numberLabel = numberTag ? `<p class="number-label">${this.parseContent(numberTag.value)}</p>` : "";
+    const tagRow = this.renderTagRow(def, { excludeKinds: ["number"] });
 
     const activeSection = this.activeSection;
     const sectionCount = this.sections.length;
     const videoUrl = activeSection?.url || def.animation?.url || null;
-    const videoLabel = activeSection?.name || def.animation?.name || def.term || "Animation";
+    const videoLabelHtml = this.parseContent(
+      activeSection?.name || def.animation?.name || def.term || "Animation",
+    );
 
     const sectionNav = this.hasSections
       ? `
         <div class="nav-row">
           <button class="nav-btn subtle" data-nav="prev-section" aria-label="Previous section" ${this.currentSectionIndex === 0 ? "disabled" : ""}>Previous</button>
           <div class="nav-label">
-            <span class="nav-snippet">${videoLabel}</span>
+            <span class="nav-snippet math-text">${videoLabelHtml}</span>
             <span class="nav-count">${this.currentSectionIndex + 1}/${sectionCount}</span>
           </div>
           <div class="nav-actions">
@@ -143,8 +143,8 @@ class DefinitionViewer extends HTMLElement {
           </div>
           <div class="player-meta">
             <div>
-              <p class="muted-label">Term: ${def.term}</p>
-              <p class="muted-label">${videoLabel}</p>
+              <p class="muted-label math-text">Term: ${this.parseContent(def.term)}</p>
+              <p class="muted-label math-text">${videoLabelHtml}</p>
             </div>
             <div class="player-actions">
               <button class="nav-btn ghost" data-video-action="replay">Replay</button>
@@ -180,7 +180,7 @@ class DefinitionViewer extends HTMLElement {
         }
         .lede {
           margin: 0;
-          color: #cbd5e1;
+          color: var(--text-regular, #c3cfe0);
           max-width: 720px;
           line-height: 1.6;
         }
@@ -212,10 +212,12 @@ class DefinitionViewer extends HTMLElement {
         }
         .definition-body {
           margin: 0;
-          color: #e2e8f0;
+          color: var(--text-regular, #c3cfe0);
           line-height: 1.7;
           font-size: 15px;
         }
+        strong { color: var(--text-strong, #e2e8f0); }
+        .math-text .katex-display { margin: 0; }
         .muted-label {
           margin: 0;
           color: #94a3b8;
@@ -223,6 +225,52 @@ class DefinitionViewer extends HTMLElement {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+        }
+        .badge-row {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .number-label {
+          margin: 0 0 2px;
+          color: #94a3b8;
+          font-size: 12px;
+          letter-spacing: 0.04em;
+        }
+        .tag-row {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          margin: 6px 0 2px;
+        }
+        .tag-chip {
+          padding: 0;
+          border-radius: 0;
+          background: transparent;
+          border: none;
+          color: #8aa0bb;
+          font-size: 12px;
+          font-weight: 600;
+          white-space: nowrap;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .tag-chip::before {
+          content: "•";
+          color: rgba(148, 163, 184, 0.65);
+        }
+        .tag-chip.chapter {
+          color: #b6a4ff;
+        }
+        .tag-chip.number {
+          color: #9cd7b0;
+        }
+        .aka {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
         }
         .pill {
           padding: 6px 10px;
@@ -233,6 +281,18 @@ class DefinitionViewer extends HTMLElement {
           font-weight: 700;
           flex-shrink: 0;
         }
+        .eyebrow {
+          margin: 0;
+          font-size: 12px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #94a3b8;
+        }
+        .pill .katex-display {
+          margin: 0;
+          display: inline;
+        }
+        .pill .katex-display > .katex { display: inline; }
         .nav-row {
           display: grid;
           grid-template-columns: auto minmax(0, 1fr) auto;
@@ -263,6 +323,11 @@ class DefinitionViewer extends HTMLElement {
           text-overflow: ellipsis;
           white-space: nowrap;
         }
+        .nav-snippet .katex-display {
+          display: inline;
+          margin: 0;
+        }
+        .nav-snippet .katex-display > .katex { display: inline; }
         .nav-count {
           color: #94a3b8;
           font-weight: 700;
@@ -380,10 +445,11 @@ class DefinitionViewer extends HTMLElement {
       <section class="shell" aria-label="Definition viewer">
         <header class="top">
           <div>
-            <p class="pill">Definition</p>
-            <h1>${def.term || "Definition"}</h1>
-            <p class="lede">${notation ? `${notation}` : ""}</p>
-            ${aliasesRow}
+            <p class="eyebrow">Definition</p>
+            ${numberLabel}
+            <h1 class="math-text">${this.parseContent(def.term || "Definition")}</h1>
+            ${tagRow}
+            <p class="lede">${notation ?? ""}</p>
           </div>
           <div class="progress-block">
             <button class="nav-btn ghost" data-nav="back-menu">Zpět do menu</button>
@@ -403,7 +469,7 @@ class DefinitionViewer extends HTMLElement {
           <aside class="visual-pane">
             <div class="visual-head">
               <p class="muted-label">Vizualizace</p>
-              <div class="scene-title">${videoLabel}</div>
+              <div class="scene-title math-text">${videoLabelHtml}</div>
             </div>
             ${videoBody}
           </aside>

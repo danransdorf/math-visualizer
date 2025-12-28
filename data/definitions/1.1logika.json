@@ -1,0 +1,100 @@
+{
+  "items": [
+    {
+      "id": "negace",
+      "term": "Negace",
+      "notation": "$\\neg A$",
+      "alsoKnownAs": ["ne"],
+      "definition": "**Negací** $\\neg A$ výroku $A$ rozumíme výrok: Není pravda, že platí $A$. $$\n\\begin{array}{|c|c|} \\hline A & \\neg A \\\\ \\hline 0 & 1 \\\\ 1 & 0 \\\\ \\hline \\end{array}$$",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      },
+      "example": "Pokud je výrok $A$: „Venku prší“, pak negace $\\neg A$ zní: „Není pravda, že venku prší“ (neboli „Venku neprší“)."
+    },
+    {
+      "id": "konjunkce",
+      "term": "Konjunkce",
+      "notation": "$A \\land B$",
+      "alsoKnownAs": ["a zároveň", "&"],
+      "definition": "**Konjunkcí** $A \\land B$ výroků $A$ a $B$ nazveme výrok: Platí $A$ i $B$. $$\n\\begin{array}{|cc|c|} \\hline A & B & A \\land B \\\\ \\hline 0 & 0 & 0 \\\\ 0 & 1 & 0 \\\\ 1 & 0 & 0 \\\\ 1 & 1 & 1 \\\\ \\hline \\end{array}$$",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      },
+      "example": "„Petr hraje na kytaru a Pavel zpívá.“ Tento výrok je pravdivý pouze tehdy, pokud se dějí obě činnosti současně."
+    },
+    {
+      "id": "disjunkce",
+      "term": "Disjunkce",
+      "notation": "$A \\lor B$",
+      "alsoKnownAs": ["nebo"],
+      "definition": "**Disjunkcí** $A \\lor B$ výroků $A$ a $B$ nazveme výrok: Platí $A$ nebo $B$. $$\n\\begin{array}{|cc|c|} \\hline A & B & A \\lor B \\\\ \\hline 0 & 0 & 0 \\\\ 0 & 1 & 1 \\\\ 1 & 0 & 1 \\\\ 1 & 1 & 1 \\\\ \\hline \\end{array}$$",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      },
+      "example": "„K obědu si dám řízek nebo svíčkovou.“ Výrok je pravdivý, pokud si dám jedno, druhé, nebo klidně obojí."
+    },
+    {
+      "id": "implikace",
+      "term": "Implikace",
+      "notation": "$A \\Rightarrow B$",
+      "alsoKnownAs": ["podmíněný výrok"],
+      "definition": "**Implikací** $A \\Rightarrow B$ nazýváme výrok: Jestliže platí výrok $A$, potom platí výrok $B$. Výroku $A$ se říká **premisa**, výroku $B$ **závěr**. Výrok $A$ je **postačující podmínkou** pro platnost $B$ a $B$ je **nutnou podmínkou** pro platnost $A$.",
+      "example": "„Jestliže bude pršet, vezmu si deštník.“ Pokud neprší (A je nepravda), implikace platí bez ohledu na to, zda deštník mám či ne.",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    },
+    {
+      "id": "ekvivalence",
+      "term": "Ekvivalence",
+      "notation": "$A \\Leftrightarrow B$",
+      "alsoKnownAs": ["logická rovnost"],
+      "definition": "**Ekvivalencí** $A \\Leftrightarrow B$ nazýváme výrok: Výrok $A$ platí tehdy a jen tehdy, když platí výrok $B$. Platnost výroku $A$ je **nutnou a postačující podmínkou** (platnosti výroku) $B$. $$\n\\begin{array}{|cc|c|} \\hline A & B & A \\Leftrightarrow B \\\\ \\hline 0 & 0 & 1 \\\\ 0 & 1 & 0 \\\\ 1 & 0 & 0 \\\\ 1 & 1 & 1 \\\\ \\hline \\end{array}$$",
+      "example": "„Trojúhelník je rovnostranný právě tehdy, když má všechny strany stejně dlouhé.“ (Oba výroky musí mít stejnou pravdivostní hodnotu).",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    },
+    {
+      "id": "vyrokova_forma",
+      "term": "Výroková forma",
+      "notation": "$V(x)$",
+      "alsoKnownAs": ["predikát"],
+      "definition": "**Výroková forma** $V$ je výraz, který má konečný počet proměnných, přičemž když za tyto proměnné dosadíme prvky z daného oboru, obdržíme výrok.",
+      "example": "Nechť $V(x)$ je výraz „$x$ je sudé číslo“. $V(4)$ je pravdivý výrok, zatímco $V(5)$ je nepravdivý výrok.",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    },
+    {
+      "id": "obecny_kvantifikator",
+      "term": "Obecný kvantifikátor",
+      "notation": "$\\forall x: V(x)$",
+      "alsoKnownAs": ["velký kv.", "univerzální kv.", "pro každé"],
+      "definition": "Symbol $\\forall$ nazýváme **obecným kvantifikátorem**. Výrok „Pro každé $x$ platí $V(x)$“ symbolicky zapisujeme ve tvaru: $$\\forall x: V(x)$$",
+      "example": "$\\forall n \\in \\mathbb{N}: n > 0$. Čteme: „Pro každé přirozené číslo $n$ platí, že je větší než nula.“",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    },
+    {
+      "id": "existencni_kvantifikator",
+      "term": "Existenční kvantifikátor",
+      "notation": "$\\exists x: V(x)$",
+      "alsoKnownAs": ["malý kv.", "existuje"],
+      "definition": "Symbol $\\exists$ nazýváme **existenčním kvantifikátorem**. Výrok „Existuje $x$ takové, že platí $V(x)$“ symbolicky zapisujeme ve tvaru: $$\\exists x: V(x)$$",
+      "example": "$\\exists x \\in \\mathbb{R}: x^2 = 2$. Čteme: „Existuje (alespoň jedno) reálné číslo $x$, pro které platí, že $x$ na druhou je rovno dvěma.“",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "items": [
+    {
+      "id": "mnozina",
+      "term": "Množina",
+      "notation": "$\\{x \\in M; V(x)\\}$",
+      "alsoKnownAs": [],
+      "definition": "**Množinou** rozumíme každé shrnutí určitých a navzájem různých objektů, které nazýváme **prvky**, do jediného celku. Množinu definujeme výčtem prvků nebo pomocí vlastnosti, kterou musejí splňovat její prvky, tj. píšeme $\\{x \\in M; V(x)\\}$, kde $M$ je množina a $V$ je výroková forma.",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    },
+    {
+      "id": "podmnozina",
+      "term": "Podmnožina",
+      "notation": "$A \\subset B$",
+      "alsoKnownAs": ["část množiny", "inkluze"],
+      "definition": "Řekneme, že množina $A$ je **částí množiny** $B$ (nebo $A$ je **podmnožinou** $B$), jestliže každý prvek množiny $A$ je rovněž prvkem množiny $B$. Tomuto vztahu říkáme **inkluze**.",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    },
+    {
+      "id": "rovnost_mnozin",
+      "term": "Rovnost množin",
+      "notation": "$A = B$",
+      "alsoKnownAs": [],
+      "definition": "Množiny $A$ a $B$ jsou si **rovny** ($A = B$), jestliže mají stejné prvky.",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    },
+    {
+      "id": "prazdna_mnozina",
+      "term": "Prázdná množina",
+      "notation": "$\\emptyset$",
+      "alsoKnownAs": [],
+      "definition": "**Prázdnou množinou** nazveme množinu, která neobsahuje žádný prvek.",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    },
+    {
+      "id": "sjednoceni",
+      "term": "Sjednocení",
+      "notation": "$A \\cup B$",
+      "alsoKnownAs": [],
+      "definition": "**Sjednocením** množin $A$ a $B$ nazveme množinu vytvořenou všemi prvky, které patří alespoň do jedné z množin $A$ či $B$. Je-li $\\mathcal{A}$ systém množin, pak jeho **sjednocení** $\\bigcup \\mathcal{A}$ definujeme jako množinu všech prvků $a$, pro které existuje $A \\in \\mathcal{A}$ takové, že $a \\in A$.",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    },
+    {
+      "id": "prunik",
+      "term": "Průnik",
+      "notation": "$A \\cap B$",
+      "alsoKnownAs": [],
+      "definition": "**Průnikem** množin $A$ a $B$ nazveme množinu všech prvků, které náležejí současně do $A$ i do $B$. Mají-li množiny $A$ a $B$ prázdný průnik, řekneme o nich, že jsou **disjunktní**. Je-li $\\mathcal{A}$ neprázdný systém množin, pak jeho **průnik** $\\bigcap \\mathcal{A}$ definujeme jako množinu všech prvků $a$, které pro každé $A \\in \\mathcal{A}$ splňují $a \\in A$.",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    },
+    {
+      "id": "rozdil",
+      "term": "Rozdíl",
+      "notation": "$A \\setminus B$",
+      "alsoKnownAs": [],
+      "definition": "**Rozdílem** množin $A$ a $B$ nazveme množinu prvků, které patří do množiny $A$ a nepatří do množiny $B$.",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    },
+    {
+      "id": "kartezsky_soucin",
+      "term": "Kartézský součin",
+      "notation": "$A_1 \\times \\dots \\times A_n$",
+      "alsoKnownAs": [],
+      "definition": "**Kartézským součinem** množin $A_1, \\dots, A_n$ nazveme množinu všech uspořádaných $n$-tic: $$A_1 \\times A_2 \\times \\dots \\times A_n = \\{[a_1, a_2, \\dots, a_n]; a_1 \\in A_1, \\dots, a_n \\in A_n\\}$$",
+      "tags": {
+        "subjects": ["Matematická analýza 1"],
+        "chapter": "1"
+      }
+    }
+  ]
+}

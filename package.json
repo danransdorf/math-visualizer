@@ -1,5 +1,5 @@
 {
-  "name": "proof-visualizer",
+  "name": "math-visualizer",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,10 +8,10 @@
     "dev:plain": "vite",
     "build": "npm run build:data && vite build",
     "preview": "vite preview",
-    "render:manim": "python3 scripts/render_manim.py",
-    "build:proofs": "python3 scripts/render_manim.py",
-    "build:proofs:text": "python3 scripts/render_manim.py --text-only",
-    "build:definitions": "python3 scripts/build_definitions.py",
+    "render:manim": "python scripts/render_manim.py",
+    "build:proofs": "python scripts/render_manim.py",
+    "build:proofs:text": "python scripts/render_manim.py --text-only",
+    "build:definitions": "python scripts/build_definitions.py",
     "build:data": "npm run build:proofs && npm run build:definitions",
     "build:text": "npm run build:proofs:text && npm run build:definitions"
   },

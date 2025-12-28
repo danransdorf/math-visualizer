@@ -1,3 +1,6 @@
+import { renderRichText } from "../utils/rich-text.js";
+import { tagList } from "../utils/tags.js";
+
 class ProofMenu extends HTMLElement {
   constructor() {
     super();
@@ -68,6 +71,49 @@ class ProofMenu extends HTMLElement {
     this.render();
   }
 
+  parseContent(text) {
+    return renderRichText(text);
+  }
+
+  getNumberTag(entry, fallback = null) {
+    const primary = tagList(entry).find((tag) => tag.kind === "number");
+    if (primary) return primary;
+    const secondary = fallback ? tagList(fallback).find((tag) => tag.kind === "number") : null;
+    return secondary || null;
+  }
+
+  formatTagLabel(tag) {
+    if (!tag || !tag.value) return "";
+    if (tag.kind === "chapter") return `Kap. ${tag.value}`;
+    if (tag.kind === "number") return `#${tag.value}`;
+    return tag.value;
+  }
+
+  renderTagRow(entry, fallback = null, { excludeKinds = [] } = {}) {
+    const primaryTags = tagList(entry).filter((tag) => !excludeKinds.includes(tag.kind));
+    const fallbackTags = fallback
+      ? tagList(fallback).filter((tag) => !excludeKinds.includes(tag.kind))
+      : [];
+    const merged = [];
+    const seen = new Set();
+
+    [...primaryTags, ...fallbackTags].forEach((tag) => {
+      const key = `${tag.kind}:${String(tag.value).toLowerCase()}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      merged.push(tag);
+    });
+
+    if (!merged.length) return "";
+    const chips = merged
+      .map(
+        (tag) =>
+          `<span class="tag-chip ${tag.kind}">${this.parseContent(this.formatTagLabel(tag))}</span>`,
+      )
+      .join("");
+    return `<div class="tag-row">${chips}</div>`;
+  }
+
   render() {
     if (!this.shadowRoot) return;
     const hasAnimations = this.animations.length > 0;
@@ -75,28 +121,26 @@ class ProofMenu extends HTMLElement {
     const definitionCards = hasDefinitions
       ? this.definitions
           .map((def) => {
-            const aka = Array.isArray(def.alsoKnownAs) && def.alsoKnownAs.length
-              ? `<p class="definition-meta">Also known as: ${def.alsoKnownAs.join(", ")}</p>`
-              : "";
-            const example = def.example
-              ? `<p class="definition-meta">Example: ${def.example}</p>`
-              : "";
             const notation = def.notation
-              ? `<span class="pill">${def.notation}</span>`
+              ? `<span class="pill notation-chip">${this.parseContent(def.notation)}</span>`
               : "";
-            const action = def.id
-              ? `<div class="definition-actions"><button class="nav-btn accent" data-open-definition="${def.id}">Otevřít definici</button></div>`
+            const snippet = def.definition
+              ? `<p class="definition-snippet">${this.parseContent(def.definition)}</p>`
               : "";
+            const numberTag = this.getNumberTag(def);
+            const numberLabel = numberTag ? `<span class="number-label">${this.parseContent(numberTag.value)}</span>` : "";
+            const tagRow = this.renderTagRow(def, null, { excludeKinds: ["number"] });
             return `
-              <article class="definition-card">
-                <div class="definition-title">
-                  <h3>${def.term || "Definition"}</h3>
+              <article class="definition-card" data-open-definition="${def.id}" role="button" tabindex="0">
+                <div class="header-row">
+                  <h3 class="math-text title-with-number">
+                    ${numberLabel}
+                    ${this.parseContent(def.term || "Definition")}
+                  </h3>
                   ${notation}
                 </div>
-                <p class="definition-body">${def.definition || ""}</p>
-                ${aka}
-                ${example}
-                ${action}
+                ${snippet}
+                ${tagRow}
               </article>
             `;
           })
@@ -105,31 +149,30 @@ class ProofMenu extends HTMLElement {
     const menuCards = hasAnimations
       ? this.animations
           .map((anim) => {
-            const title = anim.proof?.title || anim.scene || "Proof";
+            const title = anim.proof?.title || anim.scene || "Theorem";
             const desc = anim.proof?.description || anim.source || "";
             const sectionLabel = anim.sections?.length
               ? `${anim.sections.length}&nbsp;krok${anim.sections.length === 1 ? "" : anim.sections.length >= 5 ? "ů" : "y"}`
               : "0&nbsp;kroků";
+            const numberTag = this.getNumberTag(anim, anim.proof);
+            const numberLabel = numberTag ? `<span class="number-label">${this.parseContent(numberTag.value)}</span>` : "";
+            const tagRow = this.renderTagRow(anim, anim.proof, { excludeKinds: ["number"] });
             return `
-              <article class="menu-card">
-                <div class="menu-top">
-                  <div>
-                    <p class="muted-label">${anim.scene || "Scene"}</p>
-                    <h3>${title}</h3>
-                    <p class="menu-desc">${desc}</p>
-                  </div>
+              <article class="menu-card" data-open-animation="${anim.id}" role="button" tabindex="0">
+                <div class="header-row">
+                  <h3 class="title-with-number">
+                    ${numberLabel}
+                    ${title}
+                  </h3>
                   <span class="pill">${sectionLabel}</span>
                 </div>
-                <div class="menu-meta">
-                  <span class="meta-chip">${anim.source || "data/proofs/" + anim.id}</span>
-                  <span class="meta-chip">-q${anim.quality || "m"}</span>
-                </div>
-                <button class="nav-btn accent" data-open-animation="${anim.id}">Ukázat důkaz</button>
+                <div class="menu-desc">${this.parseContent(desc)}</div>
+                ${tagRow}
               </article>
             `;
           })
           .join("")
-      : `<p class="notice">${this.loading ? "Loading..." : "No proofs yet. Add Manim scenes and rerun the renderer."}</p>`;
+      : `<p class="notice">${this.loading ? "Loading..." : "No theorems yet. Add Manim scenes and rerun the renderer."}</p>`;
 
     const definitionsStatus = this.definitionsError
       ? `<p class="notice warning">${this.definitionsError}</p>`
@@ -143,6 +186,7 @@ class ProofMenu extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>
+        @import url("https://cdn.jsdelivr.net/npm/katex@0.16.27/dist/katex.min.css");
         :host { display: block; }
         .section {
           display: grid;
@@ -167,42 +211,45 @@ class ProofMenu extends HTMLElement {
         }
         .definition-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-          gap: 12px;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 16px;
         }
         .definition-card {
           background: rgba(15, 23, 42, 0.35);
           border: 1px solid rgba(148, 163, 184, 0.18);
           border-radius: 14px;
-          padding: 14px;
+          padding: 16px;
           display: grid;
-          gap: 8px;
-        }
-        .definition-title {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
           gap: 10px;
+          cursor: pointer;
+          transition: border-color 150ms ease, background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
         }
-        .definition-title h3 {
+        .definition-snippet {
           margin: 0;
-          color: #e2e8f0;
-          font-size: 18px;
-        }
-        .definition-body {
-          margin: 0;
-          color: #cbd5e1;
+          color: color-mix(in srgb, var(--text-regular, #c3cfe0) 60%, transparent);
           line-height: 1.5;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          max-width: 100%;
+          max-height: 3em;
         }
-        .definition-meta {
+        .definition-snippet p { margin: 0; display: inline; }
+        .definition-snippet .katex-display {
           margin: 0;
-          color: #94a3b8;
-          font-size: 13px;
+          display: inline;
         }
-        .definition-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 8px;
+        .definition-snippet .katex-display > .katex { display: inline; }
+        .math-text .katex-display { margin: 0; }
+        .notation-chip {
+          max-width: 200px;
+          text-align: right;
+          white-space: nowrap;
+          word-break: keep-all;
         }
         .menu-grid {
           display: grid;
@@ -216,27 +263,104 @@ class ProofMenu extends HTMLElement {
           padding: 16px;
           display: grid;
           gap: 10px;
+          cursor: pointer;
+          transition: border-color 150ms ease, background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
         }
-        .menu-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
-        h3 { margin: 4px 0 6px; color: #e2e8f0; }
+        .header-row { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+        .title-with-number {
+          margin: 0 0 6px;
+          color: #e2e8f0;
+          max-width: 100%;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          display: inline-flex;
+          align-items: baseline;
+          gap: 8px;
+          min-width: 0;
+        }
+        .number-label {
+          margin: 0;
+          color: #94a3b8;
+          font-size: 12px;
+          letter-spacing: 0.04em;
+          flex-shrink: 0;
+          display: inline-flex;
+        }
         .muted-label { margin: 0; color: #94a3b8; font-size: 12px; }
-        .menu-desc { margin: 0; color: #cbd5e1; line-height: 1.5; }
-        .pill {
-          padding: 6px 10px;
-          border-radius: 999px;
-          background: rgba(148, 163, 184, 0.16);
-          color: #94a3b8;
-          font-size: 12px;
-          font-weight: 700;
+        .menu-desc {
+          margin: 0;
+          color: color-mix(in srgb, var(--text-regular, #c3cfe0) 60%, transparent);
+          line-height: 1.5;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          max-width: 100%;
+          max-height: 3em;
         }
-        .menu-meta { display: flex; gap: 8px; flex-wrap: wrap; }
-        .meta-chip {
-          padding: 6px 10px;
-          border-radius: 999px;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(148,163,184,0.2);
-          color: #94a3b8;
+        .menu-desc p { margin: 0; display: inline; }
+        strong {
+          color: color-mix(in srgb, var(--text-strong, #c3cfe0) 80%, transparent);
+        }
+        .pill {
+          padding: 0;
+          border-radius: 0;
+          background: transparent;
+          color: #9eb4d0;
           font-size: 12px;
+          font-weight: 600;
+          white-space: nowrap;
+          word-break: keep-all;
+        }
+        .notation-chip {
+          max-width: 200px;
+          text-align: right;
+          white-space: nowrap;
+          word-break: keep-all;
+        }
+        .tag-row {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          margin-top: 2px;
+        }
+        .tag-chip {
+          padding: 0;
+          border-radius: 0;
+          background: transparent;
+          border: none;
+          color: #8aa0bb;
+          font-size: 12px;
+          font-weight: 600;
+          white-space: nowrap;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .tag-chip::before {
+          content: "•";
+          color: rgba(148, 163, 184, 0.65);
+        }
+        .tag-chip.chapter {
+          color: #b6a4ff;
+        }
+        .tag-chip.number {
+          color: #9cd7b0;
+        }
+        .pill .katex-display {
+          margin: 0;
+          display: inline;
+        }
+        .pill .katex-display > .katex { display: inline; }
+        .definition-card:hover,
+        .menu-card:hover {
+          border-color: rgba(14, 165, 233, 0.55);
+          background: rgba(15, 23, 42, 0.5);
+          transform: translateY(-1px);
+          box-shadow: 0 18px 32px rgba(8, 47, 73, 0.35);
         }
         .nav-btn {
           border: 1px solid rgba(148, 163, 184, 0.35);
@@ -272,8 +396,8 @@ class ProofMenu extends HTMLElement {
       </style>
       <div class="section">
         <div class="section-head">
-          <h2>Definitions</h2>
-          <p class="section-subhead">Quick glossary for logic</p>
+          <h2>Definice</h2>
+          <p class="section-subhead">Formální slovník</p>
         </div>
         ${definitionsStatus}
         <div class="definition-grid">
@@ -282,8 +406,8 @@ class ProofMenu extends HTMLElement {
       </div>
       <div class="section">
         <div class="section-head">
-          <h2>Proofs</h2>
-          <p class="section-subhead">Interactive walkthroughs</p>
+          <h2>Tvrzení</h2>
+          <p class="section-subhead">Interaktivní důkazy</p>
         </div>
         ${status}
         <div class="menu-grid">
@@ -292,16 +416,31 @@ class ProofMenu extends HTMLElement {
       </div>
     `;
 
-    this.shadowRoot.querySelectorAll("[data-open-animation]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const id = button.dataset.openAnimation;
-        this.dispatchEvent(new CustomEvent("select-proof", { detail: { id }, bubbles: true, composed: true }));
+    const handleActivate = (el, type) => {
+      const id =
+        type === "proof" ? el.dataset.openAnimation : el.dataset.openDefinition;
+      if (!id) return;
+      const eventName = type === "proof" ? "select-proof" : "select-definition";
+      this.dispatchEvent(new CustomEvent(eventName, { detail: { id }, bubbles: true, composed: true }));
+    };
+
+    this.shadowRoot.querySelectorAll("[data-open-animation]").forEach((card) => {
+      card.addEventListener("click", () => handleActivate(card, "proof"));
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleActivate(card, "proof");
+        }
       });
     });
-    this.shadowRoot.querySelectorAll("[data-open-definition]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const id = button.dataset.openDefinition;
-        this.dispatchEvent(new CustomEvent("select-definition", { detail: { id }, bubbles: true, composed: true }));
+
+    this.shadowRoot.querySelectorAll("[data-open-definition]").forEach((card) => {
+      card.addEventListener("click", () => handleActivate(card, "definition"));
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleActivate(card, "definition");
+        }
       });
     });
   }

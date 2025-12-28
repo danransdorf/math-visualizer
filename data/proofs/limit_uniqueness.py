@@ -31,7 +31,6 @@ class LimitUniquenessVisual(Scene):
             FadeIn(dot_L, scale=0.5), Write(label_L),
             FadeIn(dot_M, scale=0.5), Write(label_M)
         )
-        self.wait(1)
 
 
         # -----------------------------------------------------
@@ -66,7 +65,6 @@ class LimitUniquenessVisual(Scene):
         # Emphasize disjoint
         disjoint_text = Text("Disjunktní okolí!", font_size=24, color=YELLOW).next_to(number_line, UP, buff=2.5)
         self.play(FadeIn(disjoint_text))
-        self.wait(1)
 
 
         # -----------------------------------------------------
@@ -88,7 +86,6 @@ class LimitUniquenessVisual(Scene):
             LaggedStart(*[FadeIn(d, scale=0.5) for d in dots_L], lag_ratio=0.1),
             Write(label_n1)
         )
-        self.wait(0.5)
 
 
         # -----------------------------------------------------
@@ -109,7 +106,6 @@ class LimitUniquenessVisual(Scene):
             LaggedStart(*[FadeIn(d, scale=0.5) for d in dots_M], lag_ratio=0.1),
             Write(label_n2)
         )
-        self.wait(0.5)
 
 
         # -----------------------------------------------------
@@ -142,7 +138,6 @@ class LimitUniquenessVisual(Scene):
             ReplacementTransform(a_n_M, a_n_L),
             a_n_label.animate.next_to(a_n_L, UP, buff=0.1)
         )
-        self.wait(0.5)
 
 
         # -----------------------------------------------------
@@ -176,4 +171,3 @@ class LimitUniquenessVisual(Scene):
         self.play(Write(conclusion))
         self.play(Circumscribe(conclusion))
         
-        self.wait(2)

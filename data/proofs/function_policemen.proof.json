@@ -1,42 +1,31 @@
 {
   "title": "Věta o dvou strážnících",
   "description": "Je-li funkce h v prstencovém okolí bodu c sevřena mezi dvě funkce f a g, které mají v bodě c stejnou limitu A, pak má v bodě c limitu také funkce h a tato limita je rovna A.",
+  "statement": "Pokud $$f(x) \\leq h(x) \\leq g(x) \\text{ pro } x \\to c \\quad\\text{a}\\quad \\lim_{x \\to c} f(x) = \\lim_{x \\to c} g(x) = A,$$ pak $$\\lim_{x \\to c} h(x) = A.$$",
   "steps": [
     {
-      "title": "Volba libovolného epsilon",
       "statement": "Nechť je dáno libovolné $\\varepsilon > 0$.",
-      "justification": "Definice limity je formulována pomocí libovolného kladného čísla $\\varepsilon$.",
-      "insight": "Chceme ukázat, že hodnoty funkce $h(x)$ lze dostat libovolně blízko k $A$."
+      "justification": "Definice limity je formulována pomocí libovolného kladného čísla $\\varepsilon$."
     },
     {
-      "title": "Využití limity funkce f",
       "statement": "Existuje $\\delta_1 > 0$ takové, že pro všechna $x$ splňující $0 < |x - c| < \\delta_1$ platí $|f(x) - A| < \\varepsilon$, tedy $A - \\varepsilon < f(x) < A + \\varepsilon$.",
-      "justification": "Definice limity funkce $f$ v bodě $c$.",
-      "insight": "Hodnoty funkce $f$ se v okolí bodu $c$ nacházejí blízko čísla $A$."
+      "justification": "Definice limity funkce $f$ v bodě $c$."
     },
     {
-      "title": "Využití limity funkce g",
       "statement": "Existuje $\\delta_2 > 0$ takové, že pro všechna $x$ splňující $0 < |x - c| < \\delta_2$ platí $|g(x) - A| < \\varepsilon$, tedy $A - \\varepsilon < g(x) < A + \\varepsilon$.",
-      "justification": "Definice limity funkce $g$ v bodě $c$.",
-      "insight": "Také funkce $g$ se v okolí bodu $c$ blíží k téže hodnotě $A$."
+      "justification": "Definice limity funkce $g$ v bodě $c$."
     },
     {
-      "title": "Společná volba delta",
       "statement": "Položme $\\delta = \\min\\{\\delta_1, \\delta_2, \\eta\\}$.",
-      "justification": "Vlastnosti minima reálných čísel.",
-      "insight": "Zajišťujeme, aby byly současně splněny všechny potřebné podmínky."
+      "justification": "Vlastnosti minima reálných čísel."
     },
     {
-      "title": "Sevření funkce h",
       "statement": "Pro všechna $x$ splňující $0 < |x - c| < \\delta$ platí $A - \\varepsilon < f(x) \\leq h(x) \\leq g(x) < A + \\varepsilon$.",
-      "justification": "Z definice množiny $P(c, \\eta)$ a z předpokladu $f(x) \\leq h(x) \\leq g(x)$.",
-      "insight": "Hodnoty funkce $h$ jsou sevřeny mezi hodnotami funkcí $f$ a $g$, které jsou obě blízko $A$."
+      "justification": "Z definice množiny $P(c, \\eta)$ a z předpokladu $f(x) \\leq h(x) \\leq g(x)$."
     },
     {
-      "title": "Uzavření důkazu",
       "statement": "Čili pro každý $\\varepsilon$ najdeme $\\delta$ t.ž. $\\forall x \\in P(c,\\delta) : h(x) \\in B(A,\\varepsilon)$, tedy $\\lim_{x \\to c} h(x) = A$. $\\quad\\square$",
-      "justification": "Definice limity funkce v bodě.",
-      "insight": "Sevření mezi dvě funkce se stejnou limitou nutí funkci $h$ mít tutéž limitu."
+      "justification": "Definice limity funkce v bodě."
     }
   ]
 }

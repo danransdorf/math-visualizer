@@ -2,7 +2,7 @@ import "./proof-menu.js";
 import "./proof-viewer.js";
 import "./definition-viewer.js";
 
-class ProofVisualizerApp extends HTMLElement {
+class MathVisualizerApp extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
@@ -15,12 +15,24 @@ class ProofVisualizerApp extends HTMLElement {
     this.animationError = "";
     this.definitionsError = "";
     this.showMenu = true;
+    this.activeStepIndex = null;
+    this.onPopState = () => {
+      this.updateStateFromLocation();
+      this.render();
+    };
   }
 
   connectedCallback() {
+    this.initRouter();
     this.render();
     this.loadAnimations();
     this.loadDefinitions();
+  }
+
+  disconnectedCallback() {
+    if (typeof window !== "undefined") {
+      window.removeEventListener("popstate", this.onPopState);
+    }
   }
 
   get activeAnimation() {
@@ -102,10 +114,63 @@ class ProofVisualizerApp extends HTMLElement {
     });
   }
 
+  initRouter() {
+    if (typeof window === "undefined") return;
+    window.addEventListener("popstate", this.onPopState);
+    this.updateStateFromLocation();
+  }
+
+  updateStateFromLocation() {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const proofId = url.searchParams.get("proof");
+    const definitionId = url.searchParams.get("definition");
+    const stepParam = url.searchParams.get("step");
+    const parsedStep = Number.parseInt(stepParam ?? "", 10);
+    const stepIndex = Number.isFinite(parsedStep) && parsedStep > 0 ? parsedStep - 1 : null;
+
+    if (proofId) {
+      this.activeAnimationId = proofId;
+      this.activeDefinitionId = null;
+      this.showMenu = false;
+      this.activeStepIndex = stepIndex;
+    } else if (definitionId) {
+      this.activeDefinitionId = definitionId;
+      this.activeAnimationId = null;
+      this.showMenu = false;
+      this.activeStepIndex = null;
+    } else {
+      this.activeAnimationId = null;
+      this.activeDefinitionId = null;
+      this.showMenu = true;
+      this.activeStepIndex = null;
+    }
+  }
+
+  updateRoute({ proofId = null, definitionId = null, stepIndex = null } = {}, options = {}) {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("proof");
+    url.searchParams.delete("definition");
+    url.searchParams.delete("step");
+    if (proofId) {
+      url.searchParams.set("proof", proofId);
+      if (typeof stepIndex === "number" && stepIndex >= 0) {
+        url.searchParams.set("step", String(stepIndex + 1));
+      }
+    } else if (definitionId) {
+      url.searchParams.set("definition", definitionId);
+    }
+    const method = options.replace ? "replaceState" : "pushState";
+    window.history[method]({}, "", url);
+  }
+
   handleSelectProof(id) {
     this.activeAnimationId = id;
     this.activeDefinitionId = null;
     this.showMenu = false;
+    this.activeStepIndex = null;
+    this.updateRoute({ proofId: id });
     this.render();
   }
 
@@ -113,6 +178,8 @@ class ProofVisualizerApp extends HTMLElement {
     this.activeDefinitionId = id;
     this.activeAnimationId = null;
     this.showMenu = false;
+    this.activeStepIndex = null;
+    this.updateRoute({ definitionId: id });
     this.render();
   }
 
@@ -120,6 +187,8 @@ class ProofVisualizerApp extends HTMLElement {
     this.showMenu = true;
     this.activeAnimationId = null;
     this.activeDefinitionId = null;
+    this.activeStepIndex = null;
+    this.updateRoute({});
     this.render();
   }
 
@@ -150,9 +219,9 @@ class ProofVisualizerApp extends HTMLElement {
       </style>
       <section class="shell">
         <header>
-          <h1>Knihovna důkazů</h1>
+          <h1>Knihovna vět</h1>
           <p class="lede">
-            Vyber si důkaz ke zhlédnutí. Každý důkaz má formální část (v JSONu) a odpovídající Manim animace.
+            Vyber si větu/teorém ke zhlédnutí. Každá položka má formální část (v JSONu) a odpovídající Manim animace.
           </p>
         </header>
         <proof-menu></proof-menu>
@@ -187,6 +256,12 @@ class ProofVisualizerApp extends HTMLElement {
     if (viewerEl) {
       viewerEl.animation = this.activeAnimation;
       viewerEl.addEventListener("back-to-menu", () => this.handleBackToMenu());
+      viewerEl.requestedStepIndex = this.activeStepIndex;
+      viewerEl.addEventListener("step-change", (event) => {
+        const { stepIndex } = event.detail || {};
+        this.activeStepIndex = typeof stepIndex === "number" ? stepIndex : null;
+        this.updateRoute({ proofId: this.activeAnimationId, stepIndex: this.activeStepIndex });
+      });
     }
   }
 
@@ -206,4 +281,4 @@ class ProofVisualizerApp extends HTMLElement {
   }
 }
 
-customElements.define("proof-visualizer-app", ProofVisualizerApp);
+customElements.define("math-visualizer-app", MathVisualizerApp);

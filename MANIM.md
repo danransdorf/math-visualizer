@@ -45,12 +45,15 @@ Accepted shapes:
 {
   "title": "Uniqueness of Limits",
   "description": "Optional summary",
+  "statement": "Formal theorem statement in KaTeX",
   "steps": [
-    { "title": "Statement", "statement": "...", "justification": "...", "insight": "..." },
-    { "title": "Contradiction setup", "statement": "...", "justification": "...", "insight": "..." }
+    { "title": "Contradiction setup", "statement": "...", "justification": "..." },
+    { "title": "Triangle inequality", "statement": "...", "justification": "..." }
   ]
 }
 ```
+
+Use the top-level `statement` to supply the KaTeX theorem that is shown on the start screen; reserve the `steps` array for the actual proof moves.
 
 Or a file-scoped map:
 

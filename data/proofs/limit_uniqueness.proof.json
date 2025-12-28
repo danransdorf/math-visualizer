@@ -1,42 +1,33 @@
 {
   "title": "Jednoznačnost limity",
   "description": "Posloupnost nemůže konvergovat ke dvěma různým reálným číslům; důkaz sporem s využitím definice ε–N.",
+  "tags": {
+    "subjects": [
+      "Matematická analýza 1"
+    ],
+    "chapter": "2"
+  },
+  "statement": "Pokud $a_n \\to L$ a $a_n \\to M$ pro $n \\to \\infty$, pak $L = M$.",
   "steps": [
     {
-      "title": "Tvrzení",
-      "statement": "Pokud $a_n \\to L$ a $a_n \\to M$ pro $n \\to \\infty$, pak $L = M$.",
-      "justification": "Jedna posloupnost nemůže konvergovat ke dvěma různým reálným číslům.",
-      "insight": "Dokážeme to sporem. Předpokládejme opak, tedy že limity jsou různé."
-    },
-    {
-      "title": "Příprava sporu",
       "statement": "Předpokládejme, že $L \\neq M$. Zvolme $\\varepsilon$ jako polovinu jejich vzdálenosti: $$\\varepsilon = \\frac{|L - M|}{2} > 0$$",
-      "justification": "Klíčový krok: volíme epsilon tak malé, aby se okolí bodů L a M nepřekrývala.",
-      "insight": "Protože jsou L a M různá, je jejich vzdálenost kladná a můžeme ji dělit dvěma."
+      "justification": "Klíčový krok: volíme epsilon tak malé, aby se okolí bodů L a M nepřekrývala."
     },
     {
-      "title": "Konvergence k $L$",
       "statement": "Z definice limity pro $L$ existuje $N_1 \\in \\mathbb{N}$ takové, že: $$n \\ge N_1 \\implies |a_n - L| < \\varepsilon$$",
-      "justification": "Členy posloupnosti se musí nakonec \"vměstnat\" do epsilonového okolí L.",
-      "insight": "Od indexu $N_1$ jsou všechny členy blízko L."
+      "justification": "Členy posloupnosti se musí nakonec \"vměstnat\" do epsilonového okolí L."
     },
     {
-      "title": "Konvergence k $M$",
       "statement": "Analogicky pro $M$ existuje $N_2 \\in \\mathbb{N}$ takové, že: $$n \\ge N_2 \\implies |a_n - M| < \\varepsilon$$",
-      "justification": "Stejná logika pro druhou limitu se stejným epsilon.",
-      "insight": "Od indexu $N_2$ jsou všechny členy blízko M."
+      "justification": "Stejná logika pro druhou limitu se stejným epsilon."
     },
     {
-      "title": "Volba společného indexu",
       "statement": "Položme $N = \\max\\{N_1, N_2\\}$. Pro libovolné $n \\ge N$ platí obě nerovnosti současně.",
-      "justification": "Vybrali jsme index, který vyhovuje oběma podmínkám (ten větší z nich).",
-      "insight": "Teď máme člen $a_n$, který musí být v obou okolích zároveň."
+      "justification": "Vybrali jsme index, který vyhovuje oběma podmínkám (ten větší z nich)."
     },
     {
-      "title": "Spor (Trojúhelníková nerovnost)",
       "statement": "Odhadneme vzdálenost $|L - M|$: $$|L - M| \\le |L - a_n| + |a_n - M| < \\varepsilon + \\varepsilon$$ Dosadíme za $\\varepsilon$: $$|L - M| < \\frac{|L - M|}{2} + \\frac{|L - M|}{2} = |L - M|$$",
-      "justification": "Dostali jsme nerovnost $|L - M| < |L - M|$, což je nesmysl (číslo nemůže být menší než ono samo).",
-      "insight": "Předpoklad $L \\neq M$ vedl ke sporu. Proto musí platit $L = M$."
+      "justification": "Dostali jsme nerovnost $|L - M| < |L - M|$, což je nesmysl (číslo nemůže být menší než ono samo)."
     }
   ]
 }

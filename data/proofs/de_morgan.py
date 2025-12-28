@@ -31,7 +31,6 @@ class DeMorganProof(Scene):
         # Zobrazení základu
         self.add(universe, label_X)
         self.play(Create(sets_group), Write(labels_group), run_time=1.5)
-        self.wait(0.5)
 
         # ---------------------------------------------------------
         # KROK 1: Doplněk sjednocení (Vnějšek všech)
@@ -49,7 +48,6 @@ class DeMorganProof(Scene):
         
         self.play(FadeIn(complement_of_union))
         self.play(FadeIn(dot_x), Write(lbl_x))
-        self.wait(1)
 
         # ---------------------------------------------------------
         # KROK 2: Logický důsledek (Není v žádné)
@@ -76,7 +74,6 @@ class DeMorganProof(Scene):
             self.play(FadeOut(arrow), FadeOut(notin), circle.animate.set_stroke(width=4), run_time=0.3)
             arrows.add(arrow) # jen pro referenci
 
-        self.wait(0.5)
 
         # ---------------------------------------------------------
         # KROK 3: Přechod k doplňkům (Vnějšek jednotlivě)
@@ -110,7 +107,6 @@ class DeMorganProof(Scene):
         txt_1 = Text("Průnik doplňků", font_size=36).to_edge(UP)
         
         self.play(FadeIn(final_1), Write(txt_1))
-        self.wait(2)
         
         # --- RESET SCÉNY PRO DRUHOU ČÁST ---
         self.play(
@@ -200,4 +196,3 @@ class DeMorganProof(Scene):
         border_int = Intersection(inter_AB, set_C, color=WHITE, stroke_width=2, fill_opacity=0)
         
         self.play(Write(txt_final), Create(border_int))
-        self.wait(3)

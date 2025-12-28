@@ -27,6 +27,67 @@ from typing import Iterable
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _as_list(value) -> list[str]:
+    """Normalize a string/iterable into a list of trimmed, non-empty strings."""
+    if not value:
+        return []
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    if isinstance(value, Iterable):
+        items: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            text = str(item).strip()
+            if text:
+                items.append(text)
+        return items
+    return []
+
+
+def normalize_tags(entry: dict) -> dict:
+    """
+    Collect optional taxonomy metadata for a definition.
+
+    Supported inputs (all optional):
+      - tags: { subjects, chapter, number/numbering }
+      - subjects/subject at the root
+      - chapter at the root
+      - number/numbering/label at the root
+    """
+    tags = entry.get("tags", {}) if isinstance(entry, dict) else {}
+    tags_dict = tags if isinstance(tags, dict) else {}
+
+    subjects = (
+        tags_dict.get("subjects")
+        or tags_dict.get("subject")
+        or entry.get("subjects")
+        or entry.get("subject")
+    )
+    chapter = tags_dict.get("chapter") or entry.get("chapter")
+    number = (
+        tags_dict.get("number")
+        or tags_dict.get("numbering")
+        or entry.get("number")
+        or entry.get("numbering")
+        or entry.get("label")
+    )
+
+    normalized = {}
+    subject_list = _as_list(subjects)
+    if subject_list:
+        normalized["subjects"] = list(dict.fromkeys(subject_list))  # dedupe, keep order
+    if chapter is not None:
+        chapter_str = str(chapter).strip()
+        if chapter_str:
+            normalized["chapter"] = chapter_str
+    if number is not None:
+        number_str = str(number).strip()
+        if number_str:
+            normalized["number"] = number_str
+    return normalized
+
+
 def load_items_from_file(path: Path) -> list[dict]:
     try:
         payload = json.loads(path.read_text())
@@ -61,6 +122,9 @@ def load_items_from_file(path: Path) -> list[dict]:
                 for section in sections:
                     if isinstance(section, dict) and "url" not in section and section.get("file"):
                         section["url"] = "/" + str(section["file"]).lstrip("/")
+        tags = normalize_tags(entry)
+        if tags:
+            entry["tags"] = tags
         normalized.append(entry)
     return normalized
 

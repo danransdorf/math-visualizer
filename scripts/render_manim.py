@@ -23,6 +23,72 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _as_list(value) -> list[str]:
+    """Normalize a string/iterable into a list of trimmed, non-empty strings."""
+    if not value:
+        return []
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    try:
+        iterator = iter(value)
+    except TypeError:
+        return []
+    items: list[str] = []
+    for item in iterator:
+        if item is None:
+            continue
+        text = str(item).strip()
+        if text:
+            items.append(text)
+    return items
+
+
+def normalize_tags(entry: dict | None) -> dict:
+    """
+    Collect optional taxonomy metadata for a proof or manifest item.
+
+    Supported inputs (all optional):
+      - tags: { subjects, chapter, number/numbering }
+      - subjects/subject at the root
+      - chapter at the root
+      - number/numbering/label at the root
+    """
+    if not entry or not isinstance(entry, dict):
+        return {}
+
+    tags = entry.get("tags", {}) if isinstance(entry, dict) else {}
+    tags_dict = tags if isinstance(tags, dict) else {}
+
+    subjects = (
+        tags_dict.get("subjects")
+        or tags_dict.get("subject")
+        or entry.get("subjects")
+        or entry.get("subject")
+    )
+    chapter = tags_dict.get("chapter") or entry.get("chapter")
+    number = (
+        tags_dict.get("number")
+        or tags_dict.get("numbering")
+        or entry.get("number")
+        or entry.get("numbering")
+        or entry.get("label")
+    )
+
+    normalized = {}
+    subject_list = _as_list(subjects)
+    if subject_list:
+        normalized["subjects"] = list(dict.fromkeys(subject_list))  # dedupe, keep order
+    if chapter is not None:
+        chapter_str = str(chapter).strip()
+        if chapter_str:
+            normalized["chapter"] = chapter_str
+    if number is not None:
+        number_str = str(number).strip()
+        if number_str:
+            normalized["number"] = number_str
+    return normalized
+
+
 def manim_available() -> bool:
     return importlib.util.find_spec("manim") is not None
 
@@ -185,6 +251,9 @@ def load_proof_data(file_path: Path, scene_name: str) -> dict | None:
             proof = extract_proof_from_payload(payload, scene_name)
             if proof:
                 proof["source"] = str(candidate.relative_to(PROJECT_ROOT))
+                tags = normalize_tags(proof)
+                if tags:
+                    proof["tags"] = tags
                 return proof
         except Exception as exc:  # noqa: BLE001
             print(f"[manim] Skipped proof file {candidate}: {exc}", file=sys.stderr)
@@ -260,6 +329,9 @@ def refresh_text_only(manifest_path: Path, out_dir: Path, src_dir: Path) -> int:
         proof = load_proof_data(source_path, scene_name)
         if proof:
             new_item["proof"] = proof
+            tags = normalize_tags(proof)
+            if tags:
+                new_item["tags"] = tags
         updated.append(new_item)
 
     write_manifest(manifest_path, updated, out_dir)
@@ -342,18 +414,20 @@ def main() -> int:
                 video_path, sections = render_scene(file_path, scene_name, out_dir, args.quality)
                 proof = load_proof_data(file_path, scene_name)
                 public_url = "/" + video_path.relative_to(out_dir.parent).as_posix()
-                manifest_items.append(
-                    {
-                        "id": f"{file_path.stem}__{scene_name}",
-                        "scene": scene_name,
-                        "source": file_path.relative_to(PROJECT_ROOT).as_posix(),
-                        "file": video_path.relative_to(out_dir.parent).as_posix(),
-                        "url": public_url,
-                        "quality": args.quality,
-                        "sections": sections,
-                        "proof": proof,
-                    }
-                )
+                tags = normalize_tags(proof)
+                item = {
+                    "id": f"{file_path.stem}__{scene_name}",
+                    "scene": scene_name,
+                    "source": file_path.relative_to(PROJECT_ROOT).as_posix(),
+                    "file": video_path.relative_to(out_dir.parent).as_posix(),
+                    "url": public_url,
+                    "quality": args.quality,
+                    "sections": sections,
+                    "proof": proof,
+                }
+                if tags:
+                    item["tags"] = tags
+                manifest_items.append(item)
             except Exception as exc:  # noqa: BLE001
                 print(
                     f"[manim] Failed to render {file_path.name}:{scene_name} -> {exc}",
