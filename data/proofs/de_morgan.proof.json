@@ -1,0 +1,54 @@
+{
+  "title": "De Morganovy zákony pro množiny",
+  "description": "Vizuální důkaz vztahů mezi sjednocením, průnikem a doplňkem množin. Ukážeme, proč doplněk sjednocení je průnikem doplňků a naopak.",
+  "steps": [
+    {
+      "title": "1. Doplněk sjednocení: Co zkoumáme?",
+      "statement": "Uvažujme prvek $x$, který leží v doplňku sjednocení množin: $x \\in X \\setminus \\bigcup \\mathcal{A}$.",
+      "justification": "To podle definice doplňku znamená, že $x$ neleží v množině $\\bigcup \\mathcal{A}$.",
+      "insight": "Vizuálně: Hledáme oblast, která je v univerzu, ale zcela mimo jakoukoliv z barevných množin."
+    },
+    {
+      "title": "2. Logický důsledek pro jednotlivé množiny",
+      "statement": "Pokud $x \\notin \\bigcup \\mathcal{A}$, pak pro každou množinu $A \\in \\mathcal{A}$ platí $x \\notin A$.",
+      "justification": "Negace sjednocení (existenčního kvantifikátoru) vede k univerzálnímu kvantifikátoru. Kdyby $x$ bylo v jediné množině, bylo by i ve sjednocení.",
+      "insight": "Vizuálně: Bod $x$ nemůže být v červeném, zeleném ani modrém kruhu."
+    },
+    {
+      "title": "3. Přechod k doplňkům jednotlivých množin",
+      "statement": "Tvrzení $x \\notin A$ je ekvivalentní tomu, že $x \\in X \\setminus A$ (doplněk $A$).",
+      "justification": "Aplikace definice doplňku na každou jednotlivou množinu.",
+      "insight": "Vizuálně: Bod $x$ se nachází v 'vnějšku' červené množiny, zároveň ve 'vnějšku' zelené atd."
+    },
+    {
+      "title": "4. Závěr prvního zákona: Průnik doplňků",
+      "statement": "Protože $x$ leží v doplňku každé množiny, musí ležet v jejich průniku: $x \\in \\bigcap_{A \\in \\mathcal{A}} (X \\setminus A)$.",
+      "justification": "Definice průniku: prvek musí splňovat podmínku pro všechny množiny v systému.",
+      "insight": "Oblast 'mimo všechno' je přesně ta oblast, kde se překrývají vnějšky jednotlivých množin."
+    },
+    {
+      "title": "5. Doplněk průniku: Změna situace",
+      "statement": "Nyní uvažujme $x \\in X \\setminus \\bigcap \\mathcal{A}$. Tedy $x \\notin \\bigcap \\mathcal{A}$.",
+      "justification": "To znamená, že $x$ neleží ve společném průniku všech množin.",
+      "insight": "Vizuálně: Bod $x$ může být v některé množině, ale nesmí být v tom nejmenším společném středu, kde se protínají všechny."
+    },
+    {
+      "title": "6. Logický důsledek: Existence výjimky",
+      "statement": "Pokud $x$ není v průniku, pak existuje alespoň jedna množina $A \\in \\mathcal{A}$ taková, že $x \\notin A$.",
+      "justification": "Negace průniku (univerzálního kvantifikátoru) vede k existenčnímu kvantifikátoru.",
+      "insight": "Abychom nebyli ve středu, stačí, abychom chyběli alespoň v jedné z množin (např. jsme v A a B, ale chybíme v C)."
+    },
+    {
+      "title": "7. Přechod k doplňku konkrétní množiny",
+      "statement": "Pro tuto konkrétní množinu platí $x \\in X \\setminus A$.",
+      "justification": "Opět přepis pomocí definice doplňku.",
+      "insight": "Existuje tedy alespoň jeden 'vnějšek', ve kterém se náš bod nachází."
+    },
+    {
+      "title": "8. Závěr druhého zákona: Sjednocení doplňků",
+      "statement": "Pokud $x$ leží v doplňku alespoň jedné množiny, leží ve sjednocení doplňků: $x \\in \\bigcup_{A \\in \\mathcal{A}} (X \\setminus A)$.",
+      "justification": "Definice sjednocení: stačí, aby prvek patřil do jedné z podsystémových množin.",
+      "insight": "Když spojíme všechny 'vnějšky' (děravé sýry), zakryjeme vše kromě samotného středu."
+    }
+  ]
+}

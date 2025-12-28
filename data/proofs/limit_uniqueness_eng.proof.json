@@ -1,0 +1,36 @@
+{
+  "title": "Uniqueness of Limits ENG",
+  "description": "Same theorem, just in english.",
+  "steps": [
+    {
+      "title": "Statement",
+      "statement": "If $a_n \\to L$ and $a_n \\to M$ as $n \\to \\infty$, then $L = M$.",
+      "justification": "A single sequence cannot converge to two different real numbers.",
+      "insight": "We again use the ε-definition to reach a contradiction."
+    },
+    {
+      "title": "Contradiction setup",
+      "statement": "Assume $L \\neq M$. Let $\\varepsilon = |L - M| / 2 > 0$.",
+      "justification": "Pick $\\varepsilon$ as half the gap.",
+      "insight": "This makes the neighborhoods around $L$ and $M$ disjoint."
+    },
+    {
+      "title": "Convergence to both limits",
+      "statement": "There exist $N_1, N_2$ such that $n \\ge N_1 \\Rightarrow |a_n - L| < \\varepsilon$ and $n \\ge N_2 \\Rightarrow |a_n - M| < \\varepsilon$.",
+      "justification": "Apply the $\\varepsilon$-definition twice, same $\\varepsilon$.",
+      "insight": "Large enough indices land inside both bands."
+    },
+    {
+      "title": "Pick a common index",
+      "statement": "Let $N = \\max\\{N_1, N_2\\}$ and take $n \\ge N$. Then both bounds hold at once.",
+      "justification": "A single $n$ satisfies both convergence conditions.",
+      "insight": "The term $a_n$ must sit in the overlap."
+    },
+    {
+      "title": "Contradiction and conclusion",
+      "statement": "Triangle inequality gives $|L - M| \\le |L - a_n| + |a_n - M| < \\varepsilon + \\varepsilon = |L - M|$, impossible. Hence $L = M$.",
+      "justification": "The strict inequality contradicts the assumed gap.",
+      "insight": "Therefore the limits coincide."
+    }
+  ]
+}
