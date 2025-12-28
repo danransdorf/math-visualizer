@@ -262,6 +262,16 @@ class MathVisualizerApp extends HTMLElement {
         this.activeStepIndex = typeof stepIndex === "number" ? stepIndex : null;
         this.updateRoute({ proofId: this.activeAnimationId, stepIndex: this.activeStepIndex });
       });
+      viewerEl.addEventListener("claim-change", (event) => {
+        const { animationId } = event.detail || {};
+        if (!animationId) return;
+        const target = this.animations.find((anim) => anim.id === animationId);
+        if (!target) return;
+        this.activeAnimationId = animationId;
+        this.activeStepIndex = null;
+        this.updateRoute({ proofId: animationId, stepIndex: null });
+        this.render();
+      });
     }
   }
 

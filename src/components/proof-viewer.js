@@ -19,7 +19,6 @@ class ProofViewer extends HTMLElement {
     this.autoplayVideo = null;
     this.autoplayEndListener = null;
     this.pendingStepIndex = null;
-    // Removed: this.katexLoaded tracking (library is now imported)
   }
 
   set animation(value) {
@@ -272,6 +271,54 @@ class ProofViewer extends HTMLElement {
     );
   }
 
+  get claims() {
+    const claims = this.animation?.proof?.claims;
+    return Array.isArray(claims) ? claims : [];
+  }
+
+  get activeClaimId() {
+    const claims = this.claims;
+    if (!claims.length) return null;
+    const requested = this.animation?.proof?.activeClaimId;
+    const found = claims.find((claim) => claim?.id === requested);
+    if (found) return found.id;
+    return claims[0]?.id || null;
+  }
+
+  get activeClaim() {
+    const activeId = this.activeClaimId;
+    if (!activeId) return null;
+    return this.claims.find((claim) => claim?.id === activeId) || null;
+  }
+
+  renderClaimTabs() {
+    const claims = this.claims;
+    if (!claims.length) return "";
+    const activeId = this.activeClaimId;
+    if (claims.length === 1 && (!claims[0].label || claims[0].label === "main")) return "";
+
+    const buttons = claims
+      .map((claim) => {
+        const isActive = claim?.id === activeId;
+        const target = claim?.animationId || "";
+        const label = claim?.label || claim?.id || "";
+        return `
+          <button
+            class="claim-chip ${isActive ? "active" : ""}"
+            data-claim-id="${claim?.id ?? ""}"
+            ${target ? `data-claim-target="${target}"` : ""}
+            role="tab"
+            aria-selected="${isActive ? "true" : "false"}"
+          >
+            ${this.parseContent(label)}
+          </button>
+        `;
+      })
+      .join("");
+
+    return `<div class="claim-tabs" role="tablist" aria-label="Proof variants">${buttons}</div>`;
+  }
+
   renderTranscript(proofSteps) {
     const limit = Math.min(this.currentSectionIndex + 1, proofSteps.length);
     const stepsToRender = proofSteps.slice(0, limit);
@@ -337,9 +384,6 @@ class ProofViewer extends HTMLElement {
       const version = (typeof katex !== "undefined" && katex.version) ? katex.version : "0.16.10";
       const url = `https://cdn.jsdelivr.net/npm/katex@${version}/dist/katex.min.css`;
       
-      // Store for use in Shadow DOM
-      this.katexUrl = url;
-
       // Check if it's already there
       if (document.querySelector(`link[href="${url}"]`)) {
         return resolve();
@@ -352,7 +396,6 @@ class ProofViewer extends HTMLElement {
       
       link.onload = () => resolve();
       link.onerror = () => reject(new Error(`Failed to load KaTeX CSS from ${url}`));
-      console.log("styles loaded")
 
       document.head.appendChild(link);
     });
@@ -377,8 +420,20 @@ class ProofViewer extends HTMLElement {
     const theoremHtml = this.parseContent(
       this.theoremStatement || "Tato věta zatím nemá formulovaný výrok.",
     );
+    const claim = this.activeClaim;
+    const claimLabel = claim?.label || claim?.id || "";
+    const claimStatement = claim?.statement ? this.parseContent(claim.statement) : null;
+    const claimTabs = this.renderClaimTabs();
+    const claimTabsBlock = claimTabs
+      ? `
+        <div class="claim-tabs-wrapper">
+          <span class="claim-tabs-label">Vyber část důkazu:</span>
+          ${claimTabs}
+        </div>
+      `
+      : "";
     const startNote = proofSteps.length > 0
-      ? "Až klikneš na „Spustit přehrávání“, přehrajeme úvodní animaci a pak první krok."
+      ? "Vyber část věty a spusť přehrávání kroku po kroku."
       : "Přidej formální kroky do .proof.json, aby bylo co přehrát.";
 
     const transcript =
@@ -387,93 +442,32 @@ class ProofViewer extends HTMLElement {
         : `
           <div class="start-card">
             <p class="eyebrow">Dokazované tvrzení</p>
-            <h2 class="start-title">${title}</h2>
-            <div class="theorem-statement">${theoremHtml}</div>
+            <h2 class="start-title">
+              ${title}
+              ${
+                claimLabel
+                  ? `<span class="claim-heading">${this.parseContent(claimLabel)}</span>`
+                  : ""
+              }
+            </h2>
+            <div class="theorem-statement">
+              ${claimStatement || theoremHtml}
+            </div>
             <p class="start-note">${startNote}</p>
           </div>
         `;
-
-    const stepMarkers =
-      sectionCount > 0
-        ? `
-            <div class="step-markers ${showStartScreen ? "locked" : ""}" role="list">
-              ${Array.from({ length: sectionCount })
-                .map(
-                  (_, idx) => `
-                    <button
-                      class="marker ${hasStarted && idx === this.currentSectionIndex ? "active" : ""}"
-                      data-section-index="${idx}"
-                      aria-label="Jump to step ${idx + 1}"
-                      ${showStartScreen ? "tabindex='-1' aria-disabled='true'" : ""}
-                    >
-                      <span>${idx + 1}</span>
-                    </button>
-                  `,
-                )
-                .join("")}
-            </div>
-          `
-        : "";
-
-    const startCountLabel = `${sectionCount} krok${sectionCount === 1 ? "" : sectionCount >= 5 ? "ů" : "y"} připraveno`;
     const rawJustification = proofSteps[this.currentSectionIndex]?.justification || activeSection?.description || "";
     const currentJustification = this.filterCurrentOnly(rawJustification, true);
     const navSnippet = hasStarted ? currentJustification : null;
-    const navLabel = sectionCount
-      ? hasStarted
-        ? `
-          <span class="nav-explain" aria-label="Vysvětlení kroku">
-            Vysvětlení
-            <span class="hover-card">${this.parseContent(navSnippet || "Tento krok zatím nemá vysvětlení.")}</span>
-          </span>
-          <span class="nav-count">${`${this.currentSectionIndex + 1}/${sectionCount}`}</span>
-        `
-        : `<span class="nav-count">${startCountLabel}</span>`
-      : `<span class="nav-snippet">Žádné kroky zatím nejsou v JSONu</span>`;
-
-    const activeSectionName = activeSection?.name || (showStartScreen ? "Intro" : "Section");
-    const videoBody =
-      activeSection && activeSection.url
-        ? `
-            <div class="player">
-              <div class="video-frame">
-                <video key="${activeSection.id}" preload="metadata" src="${activeSection.url}" aria-label="Manim section ${activeSectionName}" muted autoplay playsinline></video>
-              </div>
-              <div class="player-meta">
-                <div>
-                  <p class="muted-label">Scene: ${this.animation?.scene || "Untitled scene"}</p>
-                  <p class="muted-label">Section: ${activeSectionName}${showStartScreen ? " (intro)" : ""}</p>
-                </div>
-                <div class="player-actions">
-                  <button class="nav-btn ghost" data-video-action="replay">Replay</button>
-                  <span class="pill">${this.animation?.quality ? `-q${this.animation.quality}` : "Section clip"}</span>
-                </div>
-              </div>
-            </div>
-          `
-        : `<p class="notice">No section video available. Add \`next_section()\` calls and rerun \`npm run build:proofs\`.</p>`;
-
-    const navRow = hasStarted && hasSteps
+    const navLabel = hasStarted
       ? `
-        <div class="nav-row">
-          <button class="nav-btn subtle" data-nav="prev-section" aria-label="Previous step" ${this.currentSectionIndex === 0 ? "disabled" : ""}>Previous</button>
-          <div class="nav-label">${navLabel}</div>
-          <div class="nav-actions">
-            <button class="nav-btn ghost" data-nav="restart-proof">Restart</button>
-            <button class="nav-btn ghost" data-nav="toggle-autoplay" ${sectionCount > 1 ? "" : "disabled"}>${this.autoplayActive ? "Stop autoplay" : "Autoplay"}</button>
-            <button class="nav-btn accent" data-nav="next-section" aria-label="Next step" ${sectionCount && this.currentSectionIndex < sectionCount - 1 ? "" : "disabled"}>Next</button>
-          </div>
-        </div>
+        <span class="nav-explain" aria-label="Vysvětlení kroku">
+          Vysvětlení
+          <span class="hover-card">${this.parseContent(navSnippet || "Tento krok zatím nemá vysvětlení.")}</span>
+        </span>
+        <span class="nav-count">${`${this.currentSectionIndex + 1}/${sectionCount || 1}`}</span>
       `
-      : `
-        <div class="nav-row start-row">
-          <div class="nav-label">${navLabel}</div>
-          <div class="nav-actions">
-            <button class="nav-btn ghost" data-nav="start-autoplay" aria-label="Autoplay proof" ${sectionCount > 1 ? "" : "disabled"}>Autoplay</button>
-            <button class="nav-btn accent" data-nav="start-proof" aria-label="Start theorem playback" ${hasSteps ? "" : "disabled"}>Spustit přehrávání</button>
-          </div>
-        </div>
-      `;
+      : "";
 
     const progressPrimary = sectionCount
       ? hasStarted
@@ -481,6 +475,62 @@ class ProofViewer extends HTMLElement {
         : `${sectionCount} krok${sectionCount === 1 ? "" : sectionCount >= 5 ? "ů" : "y"} připraveno`
       : "Waiting for steps";
     const progressSecondary = hasStarted ? `${this.progress}%` : "Ready";
+    const progressBlock = `
+      <div class="progress-block" aria-label="Progress ${sectionCount ? `(step ${this.currentSectionIndex + 1} of ${sectionCount})` : ""}">
+        <div class="progress-track">
+          <div class="progress-fill"></div>
+        </div>
+        <div class="progress-meta">
+          <span>${progressPrimary}</span>
+          <span>${progressSecondary}</span>
+        </div>
+      </div>
+    `;
+
+    const videoBody =
+      activeSection && activeSection.url
+        ? `
+            <div class="player">
+              <div class="video-frame">
+                <video key="${activeSection.id}" preload="metadata" src="${activeSection.url}" aria-label="Manim section" muted autoplay playsinline></video>
+              </div>
+              <div class="player-meta">
+                <div class="player-actions">
+                  <button class="nav-btn ghost" data-video-action="replay">Replay</button>
+                </div>
+              </div>
+            </div>
+          `
+        : `<p class="notice">No section video available. Add \`next_section()\` calls and rerun \`npm run build:proofs\`.</p>`;
+    const navButtons = hasStarted && hasSteps
+      ? `
+        <div class="nav-buttons">
+          <button class="nav-btn subtle" data-nav="prev-section" aria-label="Previous step" ${this.currentSectionIndex === 0 ? "disabled" : ""}>Previous</button>
+          <button class="nav-btn ghost" data-nav="restart-proof">Restart</button>
+          <button class="nav-btn ghost" data-nav="toggle-autoplay" ${sectionCount > 1 ? "" : "disabled"}>${this.autoplayActive ? "Stop autoplay" : "Autoplay"}</button>
+          <button class="nav-btn accent" data-nav="next-section" aria-label="Next step" ${sectionCount && this.currentSectionIndex < sectionCount - 1 ? "" : "disabled"}>Next</button>
+        </div>
+      `
+      : `
+        <div class="nav-buttons">
+          <button class="nav-btn ghost" data-nav="start-autoplay" aria-label="Autoplay proof" ${sectionCount > 1 ? "" : "disabled"}>Autoplay</button>
+          <button class="nav-btn ghost" data-nav="start-proof" aria-label="Start theorem playback" ${hasSteps ? "" : "disabled"}>Spustit přehrávání</button>
+        </div>
+      `;
+
+    const navRow = `
+      <div class="nav-row ${hasStarted && hasSteps ? "" : "start"}">
+        ${navButtons}
+      </div>
+    `;
+    const explanationBlock = navLabel ? `<div class="nav-label explanation">${navLabel}</div>` : "";
+    const controlsRow = `
+      <div class="controls-row">
+        <div class="controls-left">${navRow}</div>
+        <div class="controls-right">${progressBlock}</div>
+      </div>
+    `;
+
     const transcriptClass = showStartScreen || proofSteps.length === 0 ? "transcript start" : "transcript";
 
     this.shadowRoot.innerHTML = `
@@ -553,8 +603,77 @@ class ProofViewer extends HTMLElement {
         .tag-chip.number {
           color: #9cd7b0;
         }
+        .top-actions {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+        }
+        .claim-tabs {
+          display: inline-flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin: 6px 0 8px;
+          align-items: center;
+        }
+        .claim-tabs-wrapper {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          margin: 10px 0 12px;
+        }
+        .claim-tabs-label {
+          color: #94a3b8;
+          font-size: 13px;
+          margin-right: 4px;
+        }
+        .claim-chip {
+          border: 1px solid rgba(148, 163, 184, 0.25);
+          background: rgba(255, 255, 255, 0.04);
+          color: #e2e8f0;
+          border-radius: 999px;
+          padding: 6px 10px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+        }
+        .claim-chip.active {
+          background: rgba(14, 165, 233, 0.16);
+          border-color: rgba(14, 165, 233, 0.6);
+          color: #e0f2fe;
+          box-shadow: 0 8px 18px rgba(14, 165, 233, 0.25);
+        }
+        .claim-chip.inline {
+          padding: 4px 8px;
+          font-size: 12px;
+        }
+        .claim-chip:hover {
+          transform: translateY(-1px);
+          border-color: rgba(14, 165, 233, 0.6);
+        }
+        .statements {
+          display: grid;
+          gap: 10px;
+          margin: 10px 0 6px;
+        }
+        .statement-block {
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(148, 163, 184, 0.2);
+          border-radius: 12px;
+          padding: 12px 14px;
+        }
+        .statement-block .statement-head {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+        .statement-block .statement-body {
+          color: var(--text-regular, #c3cfe0);
+          line-height: 1.6;
+        }
         .progress-block {
-          min-width: 240px;
+          min-width: 220px;
           display: flex;
           flex-direction: column;
           gap: 8px;
@@ -582,37 +701,6 @@ class ProofViewer extends HTMLElement {
           gap: 12px;
           color: #94a3b8;
           font-size: 12px;
-        }
-        .step-markers {
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-          margin: 16px 0 6px;
-        }
-        .marker {
-          width: 32px;
-          height: 32px;
-          border-radius: 12px;
-          border: 1px solid rgba(148, 163, 184, 0.3);
-          background: rgba(255, 255, 255, 0.02);
-          color: var(--text-regular, #c3cfe0);
-          font-weight: 700;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
-        }
-        .marker:hover {
-          border-color: rgba(14, 165, 233, 0.6);
-          background: rgba(14, 165, 233, 0.08);
-          transform: translateY(-1px);
-        }
-        .marker.active {
-          background: rgba(14, 165, 233, 0.16);
-          border-color: rgba(14, 165, 233, 0.7);
-          color: #e0f2fe;
-          box-shadow: 0 12px 26px rgba(14, 165, 233, 0.25);
         }
         .grid {
           display: grid;
@@ -650,12 +738,6 @@ class ProofViewer extends HTMLElement {
         .flow-sentence:not(:last-child)::after {
           content: " ";
         }
-        .flow-sentence.active {
-          background: rgba(14, 165, 233, 0.1);
-          box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
-          border-radius: 10px;
-          padding: 2px 4px;
-        }
         .start-card {
           display: grid;
           gap: 10px;
@@ -664,7 +746,10 @@ class ProofViewer extends HTMLElement {
         .start-title {
           margin: 0;
           color: #e2e8f0;
-          font-size: clamp(20px, 3vw, 26px);
+          font-size: clamp(18px, 2.8vw, 24px);
+          display: inline-flex;
+          gap: 6px;
+          align-items: baseline;
         }
         .theorem-statement {
           padding: 12px 14px;
@@ -686,15 +771,19 @@ class ProofViewer extends HTMLElement {
           color: var(--text-regular, #c3cfe0);
           line-height: 1.5;
         }
-        .nav-row {
-          display: grid;
-          grid-template-columns: auto minmax(0, 1fr) auto;
-          align-items: center;
-          gap: 12px;
+        .claim-heading {
+          color: #94a3b8;
+          font-size: 0.95em;
+          font-weight: 600;
         }
-        .nav-row.start-row {
-          grid-template-columns: minmax(0, 1fr) auto;
+        .nav-row {
+          display: flex;
           align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .nav-row.start {
+          justify-content: space-between;
         }
         .nav-label {
           color: var(--text-regular, #c3cfe0);
@@ -702,7 +791,7 @@ class ProofViewer extends HTMLElement {
           padding: 8px 12px;
           border-radius: 12px;
           background: rgba(148, 163, 184, 0.08);
-          display: flex;
+          display: inline-flex;
           align-items: center;
           gap: 10px;
           min-width: 0;
@@ -710,6 +799,9 @@ class ProofViewer extends HTMLElement {
           white-space: nowrap;
           overflow: visible;
           line-height: 1.4;
+        }
+        .nav-label.explanation {
+          margin-top: 4px;
         }
         .nav-explain {
           position: relative;
@@ -753,15 +845,6 @@ class ProofViewer extends HTMLElement {
           pointer-events: auto;
           transform: translateY(-2px);
         }
-        .nav-snippet {
-          color: var(--text-regular, #c3cfe0);
-          display: inline-block;
-          min-width: 0;
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
         .nav-count {
           color: #94a3b8;
           font-weight: 700;
@@ -804,27 +887,29 @@ class ProofViewer extends HTMLElement {
           transform: translateY(-1px);
           border-color: rgba(14, 165, 233, 0.7);
         }
-        .nav-actions {
+        .nav-buttons {
           display: inline-flex;
           align-items: center;
           gap: 8px;
+          flex-wrap: wrap;
+        }
+        .controls-row {
+          display: grid;
+          grid-template-columns: 1fr 1.15fr;
+          gap: 22px;
+          align-items: start;
+          margin-top: 8px;
+        }
+        .controls-left {
+          display: grid;
+        }
+        .controls-right {
+          display: flex;
           justify-content: flex-end;
-          flex-shrink: 0;
         }
         .visual-pane {
           display: grid;
           gap: 12px;
-        }
-        .visual-head {
-          display: flex;
-          justify-content: space-between;
-          align-items: baseline;
-          gap: 10px;
-        }
-        .scene-title {
-          color: #e2e8f0;
-          font-weight: 700;
-          font-size: 16px;
         }
         .muted-label {
           margin: 0;
@@ -873,14 +958,6 @@ class ProofViewer extends HTMLElement {
           align-items: center;
           gap: 8px;
         }
-        .pill {
-          padding: 6px 10px;
-          border-radius: 999px;
-          background: rgba(148, 163, 184, 0.16);
-          color: #94a3b8;
-          font-size: 12px;
-          font-weight: 700;
-        }
         .notice {
           margin: 0;
           padding: 12px;
@@ -925,33 +1002,33 @@ class ProofViewer extends HTMLElement {
             ${tagRow}
             <p class="lede">${this.parseContent(description)}</p>
           </div>
-          <div class="progress-block" aria-label="Progress ${sectionCount ? `(step ${this.currentSectionIndex + 1} of ${sectionCount})` : ""}">
-            <div class="progress-track">
-              <div class="progress-fill"></div>
-            </div>
-            <div class="progress-meta">
-              <span>${progressPrimary}</span>
-              <span>${progressSecondary}</span>
-            </div>
+          <div class="top-actions">
+            <button class="nav-btn ghost" data-nav="back-menu">Zpět do menu</button>
           </div>
         </header>
 
-        ${stepMarkers}
+        <div class="statements">
+          <div class="statement-block theorem">
+            <div class="statement-head">
+              <span class="eyebrow">Celé znění věty</span>
+              ${numberLabel}
+            </div>
+            <div class="statement-body">${theoremHtml}</div>
+          </div>
+        </div>
+        ${claimTabsBlock}
+
+        ${controlsRow}
 
         <div class="grid">
           <article class="proof-pane" aria-live="polite">
             <div class="${transcriptClass}">
               ${transcript}
             </div>
-            ${navRow}
-            <button class="nav-btn" data-nav="back-menu">Menu vět</button>
+            ${explanationBlock}
           </article>
 
           <aside class="visual-pane" aria-live="polite">
-            <div class="visual-head">
-              <p class="muted-label">Scene</p>
-              <div class="scene-title">${this.animation?.scene || "Visualization"}</div>
-            </div>
             ${videoBody}
           </aside>
         </div>
@@ -959,6 +1036,7 @@ class ProofViewer extends HTMLElement {
     `;
 
     this.bindEvents();
+    this.bindClaimTabs();
     this.bindVideoActions();
     this.queueAutoplayTick();
     this.scrollToActive();
@@ -983,21 +1061,13 @@ class ProofViewer extends HTMLElement {
   }
 
   bindEvents() {
-    this.shadowRoot.querySelectorAll("[data-section-index]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const index = Number(button.dataset.sectionIndex);
-        this.stopAutoplay(false);
-        this.setSection(index);
-      });
-    });
-
     const prev = this.shadowRoot.querySelector('[data-nav="prev-section"]');
     const next = this.shadowRoot.querySelector('[data-nav="next-section"]');
     const back = this.shadowRoot.querySelector('[data-nav="back-menu"]');
     const start = this.shadowRoot.querySelector('[data-nav="start-proof"]');
+    const startAutoplay = this.shadowRoot.querySelector('[data-nav="start-autoplay"]');
     const restart = this.shadowRoot.querySelector('[data-nav="restart-proof"]');
     const toggleAutoplay = this.shadowRoot.querySelector('[data-nav="toggle-autoplay"]');
-    const startAutoplay = this.shadowRoot.querySelector('[data-nav="start-autoplay"]');
 
     if (prev) prev.addEventListener("click", () => {
       this.stopAutoplay(false);
@@ -1024,6 +1094,25 @@ class ProofViewer extends HTMLElement {
       this.emitStepChange(null);
     });
     if (toggleAutoplay) toggleAutoplay.addEventListener("click", () => this.toggleAutoplay());
+  }
+
+  bindClaimTabs() {
+    this.shadowRoot.querySelectorAll("[data-claim-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const targetAnim = button.getAttribute("data-claim-target");
+        const claimId = button.getAttribute("data-claim-id");
+        if (targetAnim && targetAnim !== this.animation?.id) {
+          this.dispatchEvent(
+            new CustomEvent("claim-change", {
+              detail: { animationId: targetAnim, claimId },
+              bubbles: true,
+              composed: true,
+            }),
+          );
+          return;
+        }
+      });
+    });
   }
 
   bindVideoActions() {

@@ -1,13 +1,27 @@
 from manim import *
 
-class DeMorganProof(Scene):
+class Part1(Scene):
     def construct(self):
-        # --- KONFIGURACE BAREV A TVARŮ ---
-        # Barvy pro množiny
+        # ---------------------------------------------------------
+        # KROK 0: Zobrazení tvrzení (Statement)
+        # ---------------------------------------------------------
+        self.next_section("Statement")
+        
+        statement_tex = MathTex(
+            r"X \setminus \bigcup \mathcal{A} = \bigcap \{X \setminus A; A \in \mathcal{A}\}"
+        ).scale(1.2)
+        
+        self.play(Write(statement_tex))
+        self.wait(2)
+        self.play(FadeOut(statement_tex))
+
+        # ---------------------------------------------------------
+        # SETUP: Konfigurace scény (Univerzum a množiny)
+        # ---------------------------------------------------------
+        # Barvy
         C_A = BLUE
         C_B = GREEN
         C_C = RED
-        C_X = GREY_A
         
         # Univerzum
         universe = Rectangle(height=6.5, width=11, color=WHITE, stroke_width=2)
@@ -37,9 +51,7 @@ class DeMorganProof(Scene):
         # ---------------------------------------------------------
         self.next_section("Krok 1")
         
-        # Definujeme sjednocení tvarů
         union_shape = Union(set_A, set_B, set_C)
-        # Definujeme doplněk (X bez Sjednocení)
         complement_of_union = Difference(universe, union_shape, color=GREY, fill_opacity=0.4, stroke_width=0)
         
         # Bod x vně
@@ -54,41 +66,30 @@ class DeMorganProof(Scene):
         # ---------------------------------------------------------
         self.next_section("Krok 2")
         
-        # Skryjeme šedou výplň, abychom se soustředili na kruhy
         self.play(FadeOut(complement_of_union))
         
         # Ukážeme šipky od kruhů k bodu s křížkem (negace)
-        arrows = VGroup()
         for circle, col in zip([set_A, set_B, set_C], [C_A, C_B, C_C]):
-            # Zvýraznění kruhu
             self.play(circle.animate.set_stroke(width=6), run_time=0.3)
             
-            # Šipka a "notin"
             arrow = Arrow(start=circle.get_center(), end=dot_x.get_center(), buff=1.7, color=col)
             notin = MathTex(r"\notin").move_to(arrow.get_center()).shift(UP*0.2).rotate(arrow.get_angle())
             
             self.play(Create(arrow), FadeIn(notin), run_time=0.5)
             self.wait(0.3)
-            
-            # Úklid
             self.play(FadeOut(arrow), FadeOut(notin), circle.animate.set_stroke(width=4), run_time=0.3)
-            arrows.add(arrow) # jen pro referenci
-
 
         # ---------------------------------------------------------
         # KROK 3: Přechod k doplňkům (Vnějšek jednotlivě)
         # ---------------------------------------------------------
         self.next_section("Krok 3")
         
-        # Pro ilustraci ukážeme doplněk množiny A (vše kromě A)
         comp_A = Difference(universe, set_A, color=C_A, fill_opacity=0.2, stroke_width=0)
         
         self.play(FadeIn(comp_A))
-        # Zvýrazníme, že x tam je
         self.play(Indicate(dot_x, scale_factor=1.5, color=YELLOW))
         self.wait(1)
         
-        # Rychle problikneme ostatní
         comp_B = Difference(universe, set_B, color=C_B, fill_opacity=0.2, stroke_width=0)
         self.play(ReplacementTransform(comp_A, comp_B))
         self.play(Indicate(dot_x))
@@ -100,44 +101,77 @@ class DeMorganProof(Scene):
         # ---------------------------------------------------------
         self.next_section("Krok 4")
         
-        # Zobrazíme všechny doplňky najednou a jejich překryv
-        # Vizuálně je to stejné jako Krok 1, ale myšlenkově to skládáme
-        
         final_1 = Difference(universe, union_shape, color=TEAL, fill_opacity=0.5, stroke_width=0)
         txt_1 = Text("Průnik doplňků", font_size=36).to_edge(UP)
         
         self.play(FadeIn(final_1), Write(txt_1))
+        self.wait(2)
+
+
+class Part2(Scene):
+    def construct(self):
+        # ---------------------------------------------------------
+        # KROK 0: Zobrazení tvrzení (Statement) - Druhé pravidlo
+        # ---------------------------------------------------------
+        self.next_section("Statement")
+
+        statement_tex = MathTex(
+            r"X \setminus \bigcap \mathcal{A} = \bigcup \{X \setminus A; A \in \mathcal{A}\}"
+        ).scale(1.2)
         
-        # --- RESET SCÉNY PRO DRUHOU ČÁST ---
-        self.play(
-            FadeOut(final_1), FadeOut(txt_1), 
-            FadeOut(dot_x), FadeOut(lbl_x)
-        )
+        self.play(Write(statement_tex))
+        self.wait(2)
+        self.play(FadeOut(statement_tex))
+
+        # ---------------------------------------------------------
+        # SETUP: Re-inicializace scény pro Part 2
+        # ---------------------------------------------------------
+        C_A, C_B, C_C = BLUE, GREEN, RED
         
+        universe = Rectangle(height=6.5, width=11, color=WHITE, stroke_width=2)
+        label_X = MathTex("X").move_to(universe.get_corner(UL) + DR * 0.5)
+        
+        r = 1.8
+        shift_amt = 1.0
+        set_A = Circle(radius=r, color=C_A, fill_opacity=0.1).shift(UP * shift_amt * 0.8)
+        set_B = Circle(radius=r, color=C_B, fill_opacity=0.1).shift(DL * shift_amt + LEFT * shift_amt * 0.8)
+        set_C = Circle(radius=r, color=C_C, fill_opacity=0.1).shift(DL * shift_amt + RIGHT * shift_amt * 0.8)
+        
+        lbl_A = MathTex("A").next_to(set_A, UP)
+        lbl_B = MathTex("B").next_to(set_B, DL)
+        lbl_C = MathTex("C").next_to(set_C, DR)
+        
+        sets_group = VGroup(set_A, set_B, set_C)
+        labels_group = VGroup(lbl_A, lbl_B, lbl_C)
+
+        self.add(universe, label_X)
+        self.play(Create(sets_group), Write(labels_group), run_time=1.0)
+
         # ---------------------------------------------------------
         # KROK 5: Doplněk průniku (Mimo střed)
         # ---------------------------------------------------------
         self.next_section("Krok 5")
         
-        # Definice průniku
+        # Definice průniku (střed)
         inter_AB = Intersection(set_A, set_B)
-        intersection_all = Intersection(inter_AB, set_C, color=WHITE, fill_opacity=1)
+        intersection_all = Intersection(inter_AB, set_C, color=WHITE, fill_opacity=1, stroke_width=0)
         
-        # Zvýrazníme střed
+        # Ukážeme, co je průnik
         self.play(FadeIn(intersection_all))
         
-        # Bod Y umístíme do A, ale mimo B a C (tedy mimo průnik)
-        # Pozice v horním kruhu (A), ale ne ve středu
-        dot_y = Dot(point=set_A.get_center() + UP*0.8, color=YELLOW)
-        lbl_y = MathTex("x").next_to(dot_y, UP)
+        # Bod x umístíme do A, ale mimo B a C (tedy mimo průnik všech)
+        dot_x = Dot(point=set_A.get_center() + UP*0.8, color=YELLOW)
+        lbl_x = MathTex("x").next_to(dot_x, UP)
         
-        self.play(FadeIn(dot_y), Write(lbl_y))
+        self.play(FadeIn(dot_x), Write(lbl_x))
         
         # Indikace: Není v bílém středu
-        line_no = Line(dot_y.get_center(), intersection_all.get_center(), color=RED)
+        line_no = Line(dot_x.get_center(), intersection_all.get_center(), color=RED)
         cross = Cross(scale_factor=0.2).move_to(line_no.get_center())
         self.play(Create(line_no), Create(cross))
         self.wait(1)
+        
+        # Úklid vizualizace průniku
         self.play(FadeOut(line_no), FadeOut(cross), FadeOut(intersection_all))
 
         # ---------------------------------------------------------
@@ -145,11 +179,10 @@ class DeMorganProof(Scene):
         # ---------------------------------------------------------
         self.next_section("Krok 6")
         
-        # Bod je v A, ale viditelně mimo B (a C). 
-        # Zvýrazníme B jako "tady nejsem"
+        # Zvýrazníme B jako množinu, ve které x není
         self.play(set_B.animate.set_fill(opacity=0.4, color=C_B))
         
-        arrow_not_in_B = Arrow(start=set_B.get_center(), end=dot_y.get_center(), color=C_B)
+        arrow_not_in_B = Arrow(start=set_B.get_center(), end=dot_x.get_center(), color=C_B)
         txt_not_in = MathTex(r"x \notin B").next_to(arrow_not_in_B.get_center(), LEFT)
         
         self.play(GrowArrow(arrow_not_in_B), Write(txt_not_in))
@@ -163,12 +196,13 @@ class DeMorganProof(Scene):
         self.next_section("Krok 7")
         
         # Zobrazíme doplněk B (X \ B)
-        # To je obrovská plocha zahrnující i kus A, kde je náš bod
+        # Toto je oblast, která pokrývá naše x
         comp_B_vis = Difference(universe, set_B, color=C_B, fill_opacity=0.2, stroke_width=0)
         
         self.play(FadeIn(comp_B_vis))
         txt_in_comp = MathTex(r"x \in (X \setminus B)").to_corner(UL)
-        self.play(Write(txt_in_comp), Indicate(dot_y, color=WHITE))
+        
+        self.play(Write(txt_in_comp), Indicate(dot_x, color=WHITE, scale_factor=1.5))
         self.wait(1.5)
         
         self.play(FadeOut(comp_B_vis), FadeOut(txt_in_comp))
@@ -178,8 +212,8 @@ class DeMorganProof(Scene):
         # ---------------------------------------------------------
         self.next_section("Krok 8")
         
-        # Ukážeme sjednocení doplňků = (X\A) U (X\B) U (X\C)
-        # To vizuálně vytvoří "děravý" střed. Vše je barevné, jen průnik je prázdný.
+        # Ukážeme sjednocení doplňků = "všechno kromě středu"
+        # Technicky vytvoříme tři doplňky a zobrazíme je přes sebe
         
         d_A = Difference(universe, set_A, fill_opacity=0.3, color=C_A, stroke_width=0)
         d_B = Difference(universe, set_B, fill_opacity=0.3, color=C_B, stroke_width=0)
@@ -187,12 +221,13 @@ class DeMorganProof(Scene):
         
         # Animujeme postupné "zakrývání"
         self.play(FadeIn(d_A), run_time=0.7)
-        self.play(FadeIn(d_B), run_time=0.7) # Teď už je bod x zakrytý (protože je v doplňku B)
+        self.play(FadeIn(d_B), run_time=0.7) 
         self.play(FadeIn(d_C), run_time=0.7)
         
         txt_final = Text("Sjednocení doplňků", font_size=36).to_edge(DOWN)
         
-        # Abychom ukázali, co zbylo (jen střed), vykreslíme hranici průniku
+        # Pro vizuální jasnost vykreslíme hranici průniku (toho bílého místa uprostřed, které zbylo prázdné)
         border_int = Intersection(inter_AB, set_C, color=WHITE, stroke_width=2, fill_opacity=0)
         
         self.play(Write(txt_final), Create(border_int))
+        self.wait(2)

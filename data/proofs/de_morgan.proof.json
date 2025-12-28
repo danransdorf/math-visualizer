@@ -2,45 +2,59 @@
   "title": "De Morganova pravidla",
   "description": "Jak se chová doplňěk průniku a sjednocení množin.",
   "tags": {
-    "subjects": [
-      "Matematická analýza 1"
-    ],
+    "subjects": ["Matematická analýza 1"],
     "chapter": "1",
     "number": "1.1"
   },
-  "statement": "Nechť $X$ je množina a $\\mathcal{A}$ je neprázdný systém množin. Pak platí\n$$ X \\setminus \\bigcup \\mathcal{A} = \\bigcap \\{X \\setminus A; A \\in \\mathcal{A}\\} $$\na dále\n$$ X \\setminus \\bigcap \\mathcal{A} = \\bigcup \\{X \\setminus A; A \\in \\mathcal{A}\\}. $$",
-  "steps": [
+  "statement": "Nechť $X$ je množina a $\\mathcal{A}$ je neprázdný systém množin. Pak platí\n$$ \\begin{aligned} &\\bullet X \\setminus \\bigcup \\mathcal{A} = \\bigcap \\{X \\setminus A; A \\in \\mathcal{A}\\} \\quad (i) \\\\[1em] &\\bullet X \\setminus \\bigcap \\mathcal{A} = \\bigcup \\{X \\setminus A; A \\in \\mathcal{A}\\}. \\quad (ii) \\end{aligned} $$",
+  "claims": [
     {
-      "statement": "Uvažujme prvek $x$, který leží v doplňku sjednocení množin: $x \\in X \\setminus \\bigcup \\mathcal{A}$.",
-      "justification": "To podle definice doplňku znamená, že $x$ neleží v množině $\\bigcup \\mathcal{A}$."
+      "id": "1",
+      "label": "(i)",
+      "scene": "Part1",
+      "statement": "$$ X \\setminus \\bigcup \\mathcal{A} = \\bigcap \\{X \\setminus A; A \\in \\mathcal{A}\\}$$",
+      "steps": [
+        {
+          "statement": "Uvažujme prvek $x$, který leží v doplňku sjednocení množin: $x \\in X \\setminus \\bigcup \\mathcal{A}$.",
+          "justification": "To podle definice doplňku znamená, že $x$ neleží v množině $\\bigcup \\mathcal{A}$."
+        },
+        {
+          "statement": "Pokud $x \\notin \\bigcup \\mathcal{A}$, pak pro každou množinu $A \\in \\mathcal{A}$ platí $x \\notin A$: $$\\begin{aligned} \\forall A \\in \\mathcal{A} :\\ &x \\notin A [[current-only]]\\end{aligned}$$[[/current-only]]",
+          "justification": "Negace sjednocení (existenčního kvantifikátoru) vede k univerzálnímu kvantifikátoru. Kdyby $x$ bylo v jediné množině, bylo by i ve sjednocení."
+        },
+        {
+          "statement": "\\\\ \\text{pak tedy} \\quad &x \\in X \\setminus A \\end{aligned} $$\n",
+          "justification": "$x \\in X$ a zároveň $x \\notin A$. Pak z definice doplňku množin platí $x \\in X \\setminus A$."
+        },
+        {
+          "statement": "Protože $x$ leží v doplňku každé množiny, musí ležet v jejich průniku: $$x \\in \\bigcap_{A \\in \\mathcal{A}} (X \\setminus A)$$",
+          "justification": "Definice průniku: prvek musí splňovat podmínku pro všechny množiny v systému."
+        }
+      ]
     },
     {
-      "statement": "Pokud $x \\notin \\bigcup \\mathcal{A}$, pak pro každou množinu $A \\in \\mathcal{A}$ platí $x \\notin A$: $$\\begin{aligned} \\forall A \\in \\mathcal{A} :\\ &x \\notin A [[current-only]]\\end{aligned}$$[[/current-only]]",
-      "justification": "Negace sjednocení (existenčního kvantifikátoru) vede k univerzálnímu kvantifikátoru. Kdyby $x$ bylo v jediné množině, bylo by i ve sjednocení."
-    },
-    {
-      "statement": "\\\\ \\text{pak tedy} \\quad &x \\in X \\setminus A \\end{aligned} $$\n",
-      "justification": "$x \\in X$ a zároveň $x \\notin A$. Pak z definice doplňku množin platí $x \\in X \\setminus A$."
-    },
-    {
-      "statement": "Protože $x$ leží v doplňku každé množiny, musí ležet v jejich průniku: $$x \\in \\bigcap_{A \\in \\mathcal{A}} (X \\setminus A)$$",
-      "justification": "Definice průniku: prvek musí splňovat podmínku pro všechny množiny v systému."
-    },
-    {
-      "statement": "Nyní uvažujme $x \\in X \\setminus \\bigcap \\mathcal{A}$. Tedy $x \\notin \\bigcap \\mathcal{A}$.",
-      "justification": "To znamená, že $x$ neleží ve společném průniku všech množin."
-    },
-    {
-      "statement": "Pokud $x$ není v průniku, pak existuje alespoň jedna množina $A \\in \\mathcal{A}$ taková, že $x \\notin A$.",
-      "justification": "Negace průniku (univerzálního kvantifikátoru) vede k existenčnímu kvantifikátoru."
-    },
-    {
-      "statement": "Pro tuto konkrétní množinu platí $x \\in X \\setminus A$.",
-      "justification": "Opět přepis pomocí definice doplňku."
-    },
-    {
-      "statement": "Pokud $x$ leží v doplňku alespoň jedné množiny, leží ve sjednocení doplňků: $x \\in \\bigcup_{A \\in \\mathcal{A}} (X \\setminus A)$.",
-      "justification": "Definice sjednocení: stačí, aby prvek patřil do jedné z podsystémových množin."
+      "id": "2",
+      "label": "(ii)",
+      "scene": "Part2",
+      "statement": "$$ X \\setminus \\bigcap \\mathcal{A} = \\bigcup \\{X \\setminus A; A \\in \\mathcal{A}\\} $$",
+      "steps": [
+        {
+          "statement": "Nyní uvažujme $x \\in X \\setminus \\bigcap \\mathcal{A}$. Tedy $x \\notin \\bigcap \\mathcal{A}$.",
+          "justification": "To znamená, že $x$ neleží ve společném průniku všech množin."
+        },
+        {
+          "statement": "Pokud $x$ není v průniku, pak existuje alespoň jedna množina $A \\in \\mathcal{A}$ taková, že $x \\notin A$.",
+          "justification": "Negace průniku (univerzálního kvantifikátoru) vede k existenčnímu kvantifikátoru."
+        },
+        {
+          "statement": "Pro tuto konkrétní množinu platí $x \\in X \\setminus A$.",
+          "justification": "Opět přepis pomocí definice doplňku."
+        },
+        {
+          "statement": "Pokud $x$ leží v doplňku alespoň jedné množiny, leží ve sjednocení doplňků: $x \\in \\bigcup_{A \\in \\mathcal{A}} (X \\setminus A)$.",
+          "justification": "Definice sjednocení: stačí, aby prvek patřil do jedné z podsystémových množin."
+        }
+      ]
     }
   ]
 }

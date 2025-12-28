@@ -89,6 +89,90 @@ def normalize_tags(entry: dict | None) -> dict:
     return normalized
 
 
+def normalize_claims(payload: dict | None) -> list[dict]:
+    """
+    Normalize claim entries so multiple proofs can live under one theorem.
+
+    Supported fields per claim (all optional):
+      - id: stable identifier, defaults to letters (a), (b), ...
+      - label: display label, defaults to f"({id})"
+      - scene/animation/variant: name of the Manim Scene that visualizes this claim
+      - statement: text of the specific claim
+      - steps: proof steps for the claim
+    """
+    if not payload or not isinstance(payload, dict):
+        return []
+    raw_claims = payload.get("claims")
+    if not isinstance(raw_claims, list):
+        return []
+
+    claims: list[dict] = []
+    for idx, entry in enumerate(raw_claims):
+        if not isinstance(entry, dict):
+            continue
+        claim_id = str(
+            entry.get("id")
+            or entry.get("label")
+            or chr(ord("a") + idx)
+        ).strip()
+        if not claim_id:
+            claim_id = chr(ord("a") + idx)
+        label = entry.get("label") or f"({claim_id})"
+        steps = entry.get("steps")
+        normalized = {
+            "id": claim_id,
+            "label": label,
+            "scene": entry.get("scene") or entry.get("animation") or entry.get("variant"),
+            "statement": entry.get("statement") or "",
+            "steps": steps if isinstance(steps, list) else [],
+        }
+        claims.append(normalized)
+    return claims
+
+
+def load_proof_payload(file_path: Path) -> tuple[dict | None, Path | None]:
+    """
+    Load the first matching proof JSON payload for the given Manim file.
+    """
+    candidates = [
+        file_path.with_suffix(".proof.json"),
+        file_path.parent / f"{file_path.stem}.proof.json",
+    ]
+
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            payload = json.loads(candidate.read_text())
+            return payload, candidate
+        except Exception as exc:  # noqa: BLE001
+            print(f"[manim] Failed to read proof file {candidate}: {exc}", file=sys.stderr)
+    return None, None
+
+
+def pick_claim_for_scene(claims: list[dict], scene_name: str, scene_index: int) -> dict | None:
+    """
+    Choose the best matching claim for the given Scene.
+    Priority:
+      1) Explicit scene/animation match
+      2) Claim id matches scene name
+      3) Claim in the same positional order as the scene
+    """
+    for claim in claims:
+        if not isinstance(claim, dict):
+            continue
+        scene_ref = (claim.get("scene") or "").strip()
+        if scene_ref and scene_ref == scene_name:
+            return claim
+    for claim in claims:
+        cid = str(claim.get("id") or "").strip()
+        if cid and cid == scene_name:
+            return claim
+    if 0 <= scene_index < len(claims):
+        return claims[scene_index]
+    return claims[0] if claims else None
+
+
 def manim_available() -> bool:
     return importlib.util.find_spec("manim") is not None
 
@@ -312,30 +396,126 @@ def refresh_text_only(manifest_path: Path, out_dir: Path, src_dir: Path) -> int:
         return 1
 
     updated: list[dict] = []
+    grouped: dict[str, list[dict]] = {}
     for item in items:
         if not isinstance(item, dict):
             continue
-        new_item = dict(item)
-        source_rel = item.get("source")
-        scene_name = item.get("scene")
-        if not source_rel or not scene_name:
-            updated.append(new_item)
+        src = item.get("source")
+        grouped.setdefault(src, []).append(item)
+
+    for source_rel, group_items in grouped.items():
+        if not source_rel:
+            updated.extend(group_items)
             continue
         source_path = (PROJECT_ROOT / source_rel).resolve()
         if not source_path.exists():
-            print(f"[manim] Source file missing for {scene_name}: {source_path}", file=sys.stderr)
-            updated.append(new_item)
+            print(f"[manim] Source file missing: {source_path}", file=sys.stderr)
+            updated.extend(group_items)
             continue
-        proof = load_proof_data(source_path, scene_name)
-        if proof:
+
+        proof_payload, proof_source_path = load_proof_payload(source_path)
+        claims = normalize_claims(proof_payload)
+        theorem_id = (
+            str(proof_payload.get("id")).strip()
+            if isinstance(proof_payload, dict) and proof_payload.get("id")
+            else (
+                str(proof_payload.get("tags", {}).get("number")).strip()
+                if isinstance(proof_payload, dict)
+                else ""
+            )
+        ) or source_path.stem
+
+        for scene_index, item in enumerate(group_items):
+            if not isinstance(item, dict):
+                continue
+            new_item = dict(item)
+            scene_name = item.get("scene")
+            proof_for_scene = extract_proof_from_payload(proof_payload, scene_name) if proof_payload else None
+            selected_claim = pick_claim_for_scene(claims, scene_name, scene_index)
+            steps = []
+            if selected_claim and isinstance(selected_claim.get("steps"), list):
+                steps = selected_claim["steps"]
+            elif proof_for_scene and isinstance(proof_for_scene.get("steps"), list):
+                steps = proof_for_scene["steps"]
+
+            proof = {
+                "title": (proof_for_scene or {}).get("title") or (proof_payload or {}).get("title"),
+                "description": (proof_for_scene or {}).get("description") or (proof_payload or {}).get("description"),
+                "statement": (proof_for_scene or {}).get("statement") or (proof_payload or {}).get("statement") or "",
+                "steps": steps,
+                "claims": [
+                    {
+                        "id": claim.get("id"),
+                        "label": claim.get("label"),
+                        "scene": claim.get("scene"),
+                        "statement": claim.get("statement"),
+                    }
+                    for claim in claims
+                ] or [{"id": "main", "label": "main"}],
+                "activeClaimId": (selected_claim or {}).get("id", "main"),
+                "theoremId": theorem_id,
+            }
+
             new_item["proof"] = proof
+            new_item["theoremId"] = theorem_id
+            if proof_source_path:
+                new_item["proofSource"] = proof_source_path.relative_to(PROJECT_ROOT).as_posix()
             tags = normalize_tags(proof)
             if tags:
                 new_item["tags"] = tags
-        updated.append(new_item)
+            updated.append(new_item)
 
+    updated = attach_claim_animation_links(updated)
     write_manifest(manifest_path, updated, out_dir)
     return 0
+
+
+def attach_claim_animation_links(items: list[dict]) -> list[dict]:
+    """
+    For each theorem (grouped by theoremId), attach animation IDs to claims and
+    ensure every item carries the full claim list.
+    """
+    grouped: dict[str, list[dict]] = {}
+    for item in items:
+        theorem_id = (
+            item.get("theoremId")
+            or (item.get("proof") or {}).get("theoremId")
+            or item.get("id")
+        )
+        grouped.setdefault(theorem_id, []).append(item)
+
+    for group_items in grouped.values():
+        claim_map: dict[str, dict] = {}
+
+        # Collect claim metadata across variants.
+        for item in group_items:
+            proof = item.get("proof") or {}
+            claims = proof.get("claims") or []
+            if not claims:
+                active_id = proof.get("activeClaimId") or "main"
+                claims = [{"id": active_id, "label": active_id}]
+            for claim in claims:
+                cid = str(claim.get("id") or "main")
+                stored = claim_map.setdefault(cid, {"id": cid})
+                for key in ("label", "statement", "scene"):
+                    if claim.get(key) and not stored.get(key):
+                        stored[key] = claim[key]
+
+        # Attach animation IDs for the claim that this item renders.
+        for item in group_items:
+            proof = item.get("proof") or {}
+            active_id = str(proof.get("activeClaimId") or "main")
+            entry = claim_map.setdefault(active_id, {"id": active_id})
+            entry.setdefault("label", f"({active_id})")
+            entry["animationId"] = item.get("id")
+
+        claims_list = sorted(claim_map.values(), key=lambda c: c.get("id", ""))
+        for item in group_items:
+            proof = item.get("proof") or {}
+            proof["claims"] = claims_list
+            item["proof"] = proof
+
+    return items
 
 
 def main() -> int:
@@ -404,15 +584,51 @@ def main() -> int:
     had_errors = False
 
     for file_path in py_files:
+        proof_payload, proof_source_path = load_proof_payload(file_path)
+        claims = normalize_claims(proof_payload)
+        theorem_id = (
+            str(proof_payload.get("id")).strip()
+            if isinstance(proof_payload, dict) and proof_payload.get("id")
+            else (
+                str(proof_payload.get("tags", {}).get("number")).strip()
+                if isinstance(proof_payload, dict)
+                else ""
+            )
+        ) or file_path.stem
+
         scenes = discover_scenes(file_path)
         if not scenes:
             print(f"[manim] No Scene subclasses discovered in {file_path.name}, skipping.")
             continue
 
-        for scene_name in scenes:
+        for scene_index, scene_name in enumerate(scenes):
             try:
                 video_path, sections = render_scene(file_path, scene_name, out_dir, args.quality)
-                proof = load_proof_data(file_path, scene_name)
+                proof_for_scene = extract_proof_from_payload(proof_payload, scene_name) if proof_payload else None
+                selected_claim = pick_claim_for_scene(claims, scene_name, scene_index)
+                steps = []
+                if selected_claim and isinstance(selected_claim.get("steps"), list):
+                    steps = selected_claim["steps"]
+                elif proof_for_scene and isinstance(proof_for_scene.get("steps"), list):
+                    steps = proof_for_scene["steps"]
+
+                proof = {
+                    "title": (proof_for_scene or {}).get("title") or (proof_payload or {}).get("title"),
+                    "description": (proof_for_scene or {}).get("description") or (proof_payload or {}).get("description"),
+                    "statement": (proof_for_scene or {}).get("statement") or (proof_payload or {}).get("statement") or "",
+                    "steps": steps,
+                    "claims": [
+                        {
+                            "id": claim.get("id"),
+                            "label": claim.get("label"),
+                            "scene": claim.get("scene"),
+                            "statement": claim.get("statement"),
+                        }
+                        for claim in claims
+                    ] or [{"id": "main", "label": "main"}],
+                    "activeClaimId": (selected_claim or {}).get("id", "main"),
+                    "theoremId": theorem_id,
+                }
                 public_url = "/" + video_path.relative_to(out_dir.parent).as_posix()
                 tags = normalize_tags(proof)
                 item = {
@@ -424,7 +640,10 @@ def main() -> int:
                     "quality": args.quality,
                     "sections": sections,
                     "proof": proof,
+                    "theoremId": theorem_id,
                 }
+                if proof_source_path:
+                    item["proofSource"] = proof_source_path.relative_to(PROJECT_ROOT).as_posix()
                 if tags:
                     item["tags"] = tags
                 manifest_items.append(item)
@@ -434,6 +653,8 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 had_errors = True
+
+    manifest_items = attach_claim_animation_links(manifest_items)
 
     if manifest_items:
         print(f"[manim] Rendered {len(manifest_items)} video(s).")

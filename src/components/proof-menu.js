@@ -118,6 +118,20 @@ class ProofMenu extends HTMLElement {
     if (!this.shadowRoot) return;
     const hasAnimations = this.animations.length > 0;
     const hasDefinitions = this.definitions.length > 0;
+
+    // Group animations by theorem so multi-claim proofs show as a single card.
+    const groups = (() => {
+      const map = new Map();
+      this.animations.forEach((anim) => {
+        const theoremId = anim.theoremId || anim.id;
+        if (!map.has(theoremId)) {
+          map.set(theoremId, []);
+        }
+        map.get(theoremId).push(anim);
+      });
+      return Array.from(map.values());
+    })();
+
     const definitionCards = hasDefinitions
       ? this.definitions
           .map((def) => {
@@ -147,24 +161,39 @@ class ProofMenu extends HTMLElement {
           .join("")
       : `<p class="notice">${this.definitionsLoading ? "Looking for definitions..." : "No definitions yet. Add some to data/definitions."}</p>`;
     const menuCards = hasAnimations
-      ? this.animations
-          .map((anim) => {
-            const title = anim.proof?.title || anim.scene || "Theorem";
-            const desc = anim.proof?.description || anim.source || "";
-            const sectionLabel = anim.sections?.length
-              ? `${anim.sections.length}&nbsp;krok${anim.sections.length === 1 ? "" : anim.sections.length >= 5 ? "ů" : "y"}`
+      ? groups
+          .map((items) => {
+            const primary = items[0];
+            const title = primary.proof?.title || primary.scene || "Theorem";
+            const desc = primary.proof?.description || primary.source || "";
+            const claims = Array.from(
+              new Map(
+                items
+                  .flatMap((anim) => anim.proof?.claims || [])
+                  .map((claim) => [claim?.id || claim?.label || "", claim]),
+              ).values(),
+            ).filter(Boolean);
+            const claimPill =
+              claims.length > 1
+                ? `<span class="pill claim-pill">${claims.map((c) => c?.label || c?.id).join(" ")}</span>`
+                : "";
+            const sectionLabel = primary.sections?.length
+              ? `${primary.sections.length}&nbsp;krok${primary.sections.length === 1 ? "" : primary.sections.length >= 5 ? "ů" : "y"}`
               : "0&nbsp;kroků";
-            const numberTag = this.getNumberTag(anim, anim.proof);
+            const numberTag = this.getNumberTag(primary, primary.proof);
             const numberLabel = numberTag ? `<span class="number-label">${this.parseContent(numberTag.value)}</span>` : "";
-            const tagRow = this.renderTagRow(anim, anim.proof, { excludeKinds: ["number"] });
+            const tagRow = this.renderTagRow(primary, primary.proof, { excludeKinds: ["number"] });
             return `
-              <article class="menu-card" data-open-animation="${anim.id}" role="button" tabindex="0">
+              <article class="menu-card" data-open-animation="${primary.id}" role="button" tabindex="0">
                 <div class="header-row">
                   <h3 class="title-with-number">
                     ${numberLabel}
                     ${title}
                   </h3>
-                  <span class="pill">${sectionLabel}</span>
+                  <div class="header-actions">
+                    ${claimPill}
+                    <span class="pill">${sectionLabel}</span>
+                  </div>
                 </div>
                 <div class="menu-desc">${this.parseContent(desc)}</div>
                 ${tagRow}
@@ -267,6 +296,7 @@ class ProofMenu extends HTMLElement {
           transition: border-color 150ms ease, background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
         }
         .header-row { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+        .header-actions { display: inline-flex; align-items: center; gap: 6px; }
         .title-with-number {
           margin: 0 0 6px;
           color: #e2e8f0;
@@ -314,6 +344,10 @@ class ProofMenu extends HTMLElement {
           font-weight: 600;
           white-space: nowrap;
           word-break: keep-all;
+        }
+        .claim-pill {
+          color: #67e8f9;
+          font-weight: 700;
         }
         .notation-chip {
           max-width: 200px;
